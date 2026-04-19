@@ -1,0 +1,48 @@
+# Models (download separately, see README)
+models/
+*.gguf
+*.safetensors
+*.bin
+
+# Compiled binaries & CUDA DLLs
+src/build/
+bin/
+*.exe
+*.dll
+*.zip
+
+# Generated images & logs
+eval/
+logs/
+*.log
+
+# Log output files (but keep requirements files)
+*_out.txt
+test_out.txt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Migration / internal tools
+sync_from_oracle.bat
+cleanup_oracle.bat
+MIGRATION_LOG.md
+
+# Personal benchmark / build scripts (not for distribution)
+run_bench.bat
+run_bench2.bat
+build_sd.bat
+build_sd2.bat
+do_build.bat
+
+# Character definitions (private IP)
+sd_characters.py
+Characters.md
+XiaoAi_Prompts.md
+
+# OS
+.DS_Store
+Thumbs.db
