@@ -49,7 +49,7 @@ Not sure where to start? Copy the prompt below and paste it to Claude, ChatGPT, 
 
 ```
 I want to set up the SD_Windows local image generation project on my computer.
-The README is at: https://github.com/[your-repo]/SD_Windows
+The README is at: https://github.com/dennisliu1112/sd-local-image-gen
 
 Please help me:
 1. Check if my system meets the requirements (Windows 10/11, NVIDIA GPU, CUDA 12.x, Python 3.10+)
@@ -67,7 +67,7 @@ Please check each step and tell me if anything is missing or if I hit an error.
 
 ```
 我想在我的電腦上安裝 SD_Windows 本地 AI 生圖專案。
-README 在這裡：https://github.com/[your-repo]/SD_Windows
+README 在這裡：https://github.com/dennisliu1112/sd-local-image-gen
 
 請幫我完成以下步驟：
 1. 確認我的電腦符合需求（Windows 10/11、NVIDIA 顯卡、CUDA 12.x、Python 3.10 以上）
