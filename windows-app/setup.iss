@@ -47,7 +47,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  ConfigPath, ModelDir, JsonContent: String;
+  ConfigPath, ModelDir, EscapedDir, JsonContent: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -56,7 +56,9 @@ begin
       ForceDirectories(ModelDir);
 
     ConfigPath := ExpandConstant('{app}\config.json');
-    JsonContent := '{"model_dir": "' + StringReplace(ModelDir, '\', '\\', [rfReplaceAll]) + '"}';
+    EscapedDir := ModelDir;
+    StringChangeEx(EscapedDir, '\', '\\', True);
+    JsonContent := '{"model_dir": "' + EscapedDir + '"}';
     SaveStringToFile(ConfigPath, JsonContent, False);
   end;
 end;
