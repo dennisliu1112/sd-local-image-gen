@@ -1,4 +1,4 @@
-name: Build Windows Portable
+name: Build Windows App
 
 on:
   push:
@@ -15,6 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Get latest stable-diffusion.cpp release
         id: sd_release
         shell: bash
@@ -28,21 +32,15 @@ jobs:
             echo "$RELEASE" | python -c "
           import sys,json
           kw='$1'
-          d=json.load(sys.stdin)
-          for a in d['assets']:
+          for a in json.load(sys.stdin)['assets']:
             n=a['name'].lower()
             if 'win' in n and kw in n and 'x64' in n and n.endswith('.zip'):
               print(a['browser_download_url']); break
           "
           }
-          VURL=$(pick vulkan)
-          CURL=$(pick avx2)
-          echo "tag=$TAG"  >> $GITHUB_OUTPUT
-          echo "vurl=$VURL" >> $GITHUB_OUTPUT
-          echo "curl=$CURL" >> $GITHUB_OUTPUT
-          echo "Release: $TAG"
-          echo "Vulkan: $VURL"
-          echo "CPU:    $CURL"
+          echo "tag=$TAG"            >> $GITHUB_OUTPUT
+          echo "vurl=$(pick vulkan)" >> $GITHUB_OUTPUT
+          echo "curl=$(pick avx2)"   >> $GITHUB_OUTPUT
 
       - name: Download both engines (Vulkan + CPU)
         shell: bash
@@ -51,70 +49,57 @@ jobs:
           curl -L "${{ steps.sd_release.outputs.curl }}" -o cpu.zip
           unzip -j vulkan.zip "*.exe" "*.dll" -d engine-vulkan/
           unzip -j cpu.zip    "*.exe" "*.dll" -d engine-cpu/
-          echo "=== engine-vulkan ==="; ls engine-vulkan/
-          echo "=== engine-cpu ==="; ls engine-cpu/
+          ls engine-vulkan/ engine-cpu/
 
-      - name: Assemble portable folder
+      - name: Install Python deps + PyInstaller
+        shell: cmd
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r windows-app\requirements.txt pyinstaller
+
+      - name: Build single-exe app (PyInstaller, no console)
+        shell: cmd
+        run: |
+          pyinstaller --noconfirm --clean ^
+            --name ZImageGen ^
+            --windowed ^
+            --add-data "windows-app/static;static" ^
+            --collect-all webview ^
+            windows-app\server.py
+          dir dist\ZImageGen
+
+      - name: Assemble distribution folder
         shell: bash
         run: |
-          mkdir -p dist/static dist/output dist/logs dist/engine-vulkan dist/engine-cpu
-          cp windows-app/server.py         dist/
-          cp windows-app/requirements.txt  dist/
-          cp windows-app/static/index.html dist/static/
-          sed 's/$/\r/' windows-app/start.bat           > dist/start.bat
-          sed 's/$/\r/' windows-app/download_models.bat > dist/download_models.bat
-          cp engine-vulkan/* dist/engine-vulkan/ 2>/dev/null || true
-          cp engine-cpu/*    dist/engine-cpu/    2>/dev/null || true
-          cat > dist/README.txt << 'EOF'
-          Z-Image Generator (Portable)
-          ============================
-          No installation needed. No admin rights needed.
+          APP=dist/ZImageGen
+          mkdir -p "$APP/engine-vulkan" "$APP/engine-cpu" "$APP/models"
+          cp engine-vulkan/* "$APP/engine-vulkan/" 2>/dev/null || true
+          cp engine-cpu/*    "$APP/engine-cpu/"    2>/dev/null || true
+          cat > "$APP/README.txt" << 'EOF'
+          Z-Image Generator
+          =================
+          Double-click ZImageGen.exe — no install, no admin needed.
 
-          IMPORTANT: Put this folder in an English-only path such as
-            C:\ZImageGen
-          Avoid Chinese folders, the Desktop (桌面), or OneDrive — the
-          image engine cannot open model files under non-English paths.
+          IMPORTANT: keep this folder in an English-only path (e.g. C:\ZImageGen).
+          Avoid Chinese folders, Desktop (桌面), or OneDrive.
 
-          1. Run start.bat  (double-click)
-          2. Browser opens at http://localhost:8080
-          3. On first launch, enter your model folder path in the setup screen,
-             OR run download_models.bat to download the ~6.3 GB models.
-
-          To move/copy this app: just move the whole folder.
+          First launch: a setup screen lets you pick your model folder, or
+          download the models (~6.3 GB). Closing the window stops everything.
           EOF
+          ls -la "$APP"
 
-      - name: Bundle embeddable Python + dependencies
-        shell: bash
-        run: |
-          PY_VER=3.12.9
-          curl -L "https://www.python.org/ftp/python/${PY_VER}/python-${PY_VER}-embed-amd64.zip" -o py_embed.zip
-          mkdir -p dist/python
-          unzip -q py_embed.zip -d dist/python
-
-          # Enable site-packages so pip-installed deps are importable
-          PTH=$(ls dist/python/python*._pth)
-          printf 'python312.zip\r\n.\r\nLib\\site-packages\r\nimport site\r\n' > "$PTH"
-
-          # Bootstrap pip, then install runtime deps into the embeddable python
-          curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-          dist/python/python.exe get-pip.py --no-warn-script-location
-          dist/python/python.exe -m pip install --no-warn-script-location -r dist/requirements.txt
-
-          echo "Bundled Python contents:"
-          ls dist/python
-
-      - name: Create ZIP
+      - name: Zip
         shell: bash
         run: |
           TAG="${{ steps.sd_release.outputs.tag }}"
           cd dist
-          7z a -tzip "../ZImageGen_Portable_${TAG}.zip" . >/dev/null
+          7z a -tzip "../ZImageGen_Windows_${TAG}.zip" ZImageGen >/dev/null
           cd ..
-          ls -lh ZImageGen_Portable_*.zip
+          ls -lh ZImageGen_Windows_*.zip
 
-      - name: Upload portable ZIP
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: ZImageGen-Portable-${{ steps.sd_release.outputs.tag }}
-          path: ZImageGen_Portable_*.zip
+          name: ZImageGen-Windows-${{ steps.sd_release.outputs.tag }}
+          path: ZImageGen_Windows_*.zip
           retention-days: 30

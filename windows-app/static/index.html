@@ -232,6 +232,29 @@
   }
   #setup-save:hover { background: #9474ff; }
   #setup-status { font-size: 12px; color: #888; text-align: center; margin-top: 12px; min-height: 18px; }
+  #setup-download {
+    width: 100%; background: transparent; color: #9474ff; border: 1px solid #3a2e60;
+    border-radius: 10px; padding: 10px; font-size: 13px; cursor: pointer; margin-top: 10px;
+  }
+  #setup-download:hover { background: #1d1830; }
+
+  /* ── Tabs ── */
+  .tab-btn {
+    background: transparent; border: 1px solid #2e2e40; color: #888;
+    border-radius: 8px; padding: 5px 14px; font-size: 12px; cursor: pointer;
+    transition: all .15s;
+  }
+  .tab-btn:hover { color: #ccc; }
+  .tab-btn.active { background: #7c5cfc; color: #fff; border-color: #7c5cfc; }
+
+  #view-gen { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+  #view-log { display: none; flex: 1; overflow: auto; padding: 16px 20px; }
+  #view-log pre {
+    font-size: 11px; color: #9aa3b2; white-space: pre-wrap; word-break: break-all;
+    font-family: ui-monospace, Menlo, Consolas, monospace; line-height: 1.5;
+  }
+  .log-section-title { color: #7c5cfc; font-size: 12px; margin: 16px 0 6px; font-weight: 600; }
+  .log-section-title:first-child { margin-top: 0; }
 </style>
 </head>
 <body>
@@ -248,7 +271,8 @@
       <div class="setup-hint">Must contain: z_image_turbo-Q4_K.gguf, ae.safetensors, Qwen3-4B-Q4_K_M.gguf</div>
       <div class="setup-missing" id="setup-missing-list"></div>
     </div>
-    <button id="setup-save" onclick="saveModelDir()">Save &amp; Continue</button>
+    <button id="setup-save" onclick="saveModelDir()">儲存並繼續</button>
+    <button id="setup-download" onclick="downloadModels()">下載模型（約 6.3 GB）</button>
     <div id="setup-status"></div>
   </div>
 </div>
@@ -257,8 +281,13 @@
   <div id="status-dot"></div>
   <h1>Z-Image Generator</h1>
   <span id="status-text">連線中…</span>
+  <div style="margin-left:auto; display:flex; gap:6px">
+    <button class="tab-btn active" id="tab-gen" onclick="switchTab('gen')">生成</button>
+    <button class="tab-btn" id="tab-log" onclick="switchTab('log')">記錄</button>
+  </div>
 </header>
 
+<div id="view-gen">
 <main>
   <!-- Left: history -->
   <div id="history-panel">
@@ -297,12 +326,12 @@
   <div id="controls-row">
     <span class="ctrl-label">解析度</span>
     <select id="resolution">
-      <option value="512,512">512 × 512（~1 分）</option>
-      <option value="768,768">768 × 768（~3 分）</option>
-      <option value="1024,1024" selected>1024 × 1024（~5 分）</option>
-      <option value="1216,1216">1216 × 1216（~8 分）</option>
-      <option value="1024,1280">1024 × 1280 縱向（~7 分）</option>
-      <option value="1280,1024">1280 × 1024 橫向（~7 分）</option>
+      <option value="512,512" selected>512 × 512</option>
+      <option value="768,768">768 × 768</option>
+      <option value="1024,1024">1024 × 1024</option>
+      <option value="1216,1216">1216 × 1216</option>
+      <option value="1024,1280">1024 × 1280 縱向</option>
+      <option value="1280,1024">1280 × 1024 橫向</option>
     </select>
 
     <span class="ctrl-label" style="margin-left:8px">Steps</span>
@@ -314,6 +343,11 @@
 
     <button onclick="document.getElementById('seed').value=Math.floor(Math.random()*2**32)" style="background:#1a1a22;border:1px solid #2e2e40;color:#888;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">🎲</button>
   </div>
+</div>
+</div><!-- /view-gen -->
+
+<div id="view-log">
+  <pre id="log-content">尚無記錄。</pre>
 </div>
 
 <script>
@@ -528,6 +562,49 @@ function updateHistoryItem(job) {
 document.getElementById('prompt').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); }
 });
+
+// ── Tabs + log view ──────────────────────────────────────────────────────
+let logTimer = null;
+function switchTab(t) {
+  document.getElementById('tab-gen').classList.toggle('active', t === 'gen');
+  document.getElementById('tab-log').classList.toggle('active', t === 'log');
+  document.getElementById('view-gen').style.display = t === 'gen' ? 'flex' : 'none';
+  document.getElementById('view-log').style.display = t === 'log' ? 'block' : 'none';
+  clearInterval(logTimer);
+  if (t === 'log') { refreshLogs(); logTimer = setInterval(refreshLogs, 2000); }
+}
+function escHtml(s) { return (s || '').replace(/</g, '&lt;'); }
+async function refreshLogs() {
+  try {
+    const d = await (await fetch(`${API}/logs`)).json();
+    document.getElementById('log-content').innerHTML =
+      `<div class="log-section-title">引擎：${d.engine || '-'}　狀態：${d.state || '-'}</div>` +
+      `<div class="log-section-title">應用程式記錄 (app.log)</div>${escHtml(d.app) || '(空)'}` +
+      `<div class="log-section-title">生圖引擎記錄 (sd-server.log)</div>${escHtml(d.sd_server) || '(空)'}`;
+  } catch {}
+}
+
+// ── Model download ───────────────────────────────────────────────────────
+async function downloadModels() {
+  const dir = document.getElementById('setup-model-dir').value.trim();
+  if (dir) {
+    await fetch(`${API}/config`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({model_dir: dir})
+    });
+  }
+  await fetch(`${API}/download_models`, {method: 'POST'});
+  const st = document.getElementById('setup-status');
+  const timer = setInterval(async () => {
+    try {
+      const d = await (await fetch(`${API}/download_status`)).json();
+      if (d.error)      { st.textContent = '下載失敗：' + d.error; clearInterval(timer); }
+      else if (d.done)  { st.textContent = '下載完成！正在啟動引擎…'; clearInterval(timer);
+                          setTimeout(() => { document.getElementById('setup-overlay').classList.remove('show'); checkReady(); }, 1200); }
+      else if (d.active){ st.textContent = `下載中 ${d.file} … ${d.pct}%`; }
+    } catch {}
+  }, 1000);
+}
 
 // ── Model setup ────────────────────────────────────────────────────────────
 async function checkModels() {

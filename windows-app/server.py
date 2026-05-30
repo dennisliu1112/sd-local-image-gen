@@ -35,11 +35,20 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-ROOT       = Path(__file__).parent
+# When frozen by PyInstaller, sys.executable is the .exe; bundled data (static)
+# lives in sys._MEIPASS. Engines/models/output/logs sit next to the .exe.
+if getattr(sys, "frozen", False):
+    APP_DIR    = Path(sys.executable).parent
+    BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", APP_DIR))
+else:
+    APP_DIR    = Path(__file__).parent
+    BUNDLE_DIR = APP_DIR
+
+ROOT       = APP_DIR
 EXE_NAME   = "sd-server.exe" if os.name == "nt" else "sd-server"
 OUTPUT_DIR = ROOT / "output"
 LOG_DIR    = ROOT / "logs"
-STATIC_DIR = ROOT / "static"
+STATIC_DIR = BUNDLE_DIR / "static"
 CONFIG_FILE = ROOT / "config.json"
 
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -98,8 +107,21 @@ SD_URL             = f"http://127.0.0.1:{SD_PORT}"
 SD_READY_TIMEOUT   = 300
 API_PORT           = int(os.environ.get("PORT", "8080"))
 
+from collections import deque
+_LOG_BUFFER: deque = deque(maxlen=400)
+
+class _BufferHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            _LOG_BUFFER.append(self.format(record))
+        except Exception:
+            pass
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-log = logging.getLogger(__name__)
+_bufh = _BufferHandler()
+_bufh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+logging.getLogger().addHandler(_bufh)   # capture our logs in memory for the Log tab
+log = logging.getLogger("zimage")
 
 # ---------------------------------------------------------------------------
 # Job store
@@ -496,7 +518,75 @@ def set_config_endpoint(req: ConfigRequest):
     cfg = load_config()
     cfg["model_dir"] = str(p)
     save_config(cfg)
-    return {"model_dir": str(p), "models_ready": models_ready()}
+    ready = models_ready()
+    # Models just became available → bring the engine up.
+    if ready and sd_status.get("state") not in ("ready", "starting"):
+        threading.Thread(target=start_sd_server, daemon=True).start()
+    return {"model_dir": str(p), "models_ready": ready}
+
+
+@app.get("/logs")
+def get_logs():
+    return {
+        "app":       "\n".join(_LOG_BUFFER),
+        "sd_server": _log_tail(LOG_DIR / "sd_server.log", lines=150),
+        "engine":    sd_status.get("engine", ""),
+        "state":     sd_status.get("state", ""),
+    }
+
+
+# --- Model download (replaces download_models.bat) -------------------------
+download_state = {"active": False, "pct": 0, "file": "", "done": False, "error": ""}
+
+MODELS_DL = [
+    ("z_image_turbo-Q4_K.gguf",
+     "https://huggingface.co/shuttleai/shuttle-jaguar/resolve/main/z_image_turbo-Q4_K.gguf"),
+    ("ae.safetensors",
+     "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors"),
+    ("Qwen3-4B-Q4_K_M.gguf",
+     "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"),
+]
+
+
+def _download_thread(dest: Path):
+    import urllib.request
+    download_state.update(active=True, done=False, error="", pct=0, file="")
+    try:
+        dest.mkdir(parents=True, exist_ok=True)
+        for fname, url in MODELS_DL:
+            out = dest / fname
+            if out.exists() and out.stat().st_size > 0:
+                continue
+            download_state["file"] = fname
+            download_state["pct"]  = 0
+
+            def hook(count, block, total):
+                if total > 0:
+                    download_state["pct"] = min(100, count * block * 100 // total)
+
+            tmp = str(out) + ".part"
+            urllib.request.urlretrieve(url, tmp, reporthook=hook)
+            os.replace(tmp, str(out))
+        download_state.update(active=False, done=True, pct=100, file="")
+        log.info("Model download complete.")
+        if models_ready() and sd_status.get("state") != "ready":
+            threading.Thread(target=start_sd_server, daemon=True).start()
+    except Exception as e:
+        download_state.update(active=False, error=str(e))
+        log.error("Model download failed: %s", e)
+
+
+@app.post("/download_models")
+def download_models():
+    if download_state["active"]:
+        return {"active": True}
+    threading.Thread(target=_download_thread, args=(get_model_dir(),), daemon=True).start()
+    return {"active": True}
+
+
+@app.get("/download_status")
+def download_status():
+    return download_state
 
 
 @app.get("/")
@@ -508,6 +598,47 @@ def index():
 
 
 # ---------------------------------------------------------------------------
-if __name__ == "__main__":
+def _serve():
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=API_PORT, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=API_PORT, log_level="warning")
+
+
+def _wait_health(timeout_s: int = 40) -> bool:
+    for _ in range(timeout_s * 2):
+        try:
+            if httpx.get(f"http://127.0.0.1:{API_PORT}/health", timeout=1).status_code == 200:
+                return True
+        except Exception:
+            pass
+        time.sleep(0.5)
+    return False
+
+
+def _shutdown():
+    try:
+        if sd_server_proc:
+            sd_server_proc.terminate()
+    except Exception:
+        pass
+
+
+if __name__ == "__main__":
+    # Frozen .exe (or ZIMAGE_UI=1) → open a native desktop window via pywebview.
+    # Otherwise run headless (dev on macOS, curl testing).
+    want_ui = getattr(sys, "frozen", False) or os.environ.get("ZIMAGE_UI") == "1"
+    if want_ui:
+        threading.Thread(target=_serve, daemon=True).start()
+        _wait_health()
+        try:
+            import webview
+            webview.create_window(
+                "Z-Image Generator",
+                f"http://127.0.0.1:{API_PORT}",
+                width=1180, height=820, min_size=(900, 640),
+            )
+            webview.start()          # blocks until the window is closed
+        finally:
+            _shutdown()              # closing the window stops the server
+            os._exit(0)
+    else:
+        _serve()
