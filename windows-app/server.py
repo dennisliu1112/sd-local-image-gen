@@ -622,23 +622,42 @@ def _shutdown():
         pass
 
 
-if __name__ == "__main__":
-    # Frozen .exe (or ZIMAGE_UI=1) → open a native desktop window via pywebview.
-    # Otherwise run headless (dev on macOS, curl testing).
-    want_ui = getattr(sys, "frozen", False) or os.environ.get("ZIMAGE_UI") == "1"
-    if want_ui:
-        threading.Thread(target=_serve, daemon=True).start()
-        _wait_health()
+def _open_window():
+    """Open the native app window; fall back to the system browser if the
+    webview backend can't start. Writes a crash log next to the exe."""
+    url = f"http://127.0.0.1:{API_PORT}"
+    threading.Thread(target=_serve, daemon=True).start()
+    _wait_health()
+    try:
+        import webview
+        log.info("Opening native window via pywebview…")
+        webview.create_window("Z-Image Generator", url,
+                              width=1180, height=820, min_size=(900, 640))
+        webview.start()              # blocks until the window is closed
+        _shutdown()
+        os._exit(0)
+    except Exception:
+        import traceback, webbrowser
+        tb = traceback.format_exc()
         try:
-            import webview
-            webview.create_window(
-                "Z-Image Generator",
-                f"http://127.0.0.1:{API_PORT}",
-                width=1180, height=820, min_size=(900, 640),
-            )
-            webview.start()          # blocks until the window is closed
+            (APP_DIR / "ZImageGen_error.log").write_text(
+                "pywebview failed to open a window; opened the browser instead.\n\n" + tb,
+                encoding="utf-8")
+        except Exception:
+            pass
+        log.error("pywebview failed; falling back to browser:\n%s", tb)
+        try: webbrowser.open(url)
+        except Exception: pass
+        try:
+            while True:
+                time.sleep(3600)     # keep server alive for the browser
         finally:
-            _shutdown()              # closing the window stops the server
-            os._exit(0)
+            _shutdown()
+
+
+if __name__ == "__main__":
+    # Frozen .exe (or ZIMAGE_UI=1) → desktop window. Else headless (dev).
+    if getattr(sys, "frozen", False) or os.environ.get("ZIMAGE_UI") == "1":
+        _open_window()
     else:
         _serve()

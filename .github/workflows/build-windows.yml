@@ -57,14 +57,18 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r windows-app\requirements.txt pyinstaller
 
-      - name: Build single-exe app (PyInstaller, no console)
+      - name: Build app (PyInstaller)
         shell: cmd
         run: |
           pyinstaller --noconfirm --clean ^
             --name ZImageGen ^
-            --windowed ^
+            --console ^
             --add-data "windows-app/static;static" ^
             --collect-all webview ^
+            --collect-all clr_loader ^
+            --collect-all pythonnet ^
+            --copy-metadata pywebview ^
+            --hidden-import clr ^
             windows-app\server.py
           dir dist\ZImageGen
 
