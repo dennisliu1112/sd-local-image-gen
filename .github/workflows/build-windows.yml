@@ -1,4 +1,4 @@
-name: Build Windows Installer
+name: Build Windows MSI
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get latest stable-diffusion.cpp release info
+      - name: Get latest stable-diffusion.cpp release
         id: sd_release
         shell: bash
         run: |
@@ -36,14 +36,13 @@ jobs:
           ")
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "url=$URL"  >> $GITHUB_OUTPUT
-          echo "Found: $TAG"
+          echo "Found release: $TAG"
 
-      - name: Download sd-server binary
+      - name: Download sd-server Vulkan binary
         shell: bash
         run: |
-          URL="${{ steps.sd_release.outputs.url }}"
-          curl -L "$URL" -o sd_release.zip
-          unzip -j sd_release.zip "*.exe" "*.dll" -d sd_bin/ || true
+          curl -L "${{ steps.sd_release.outputs.url }}" -o sd_release.zip
+          unzip -j sd_release.zip "*.exe" "*.dll" -d sd_bin/
           ls sd_bin/
 
       - name: Assemble dist folder
@@ -51,61 +50,78 @@ jobs:
         run: |
           mkdir -p dist/static dist/models dist/output dist/logs
 
-          cp windows-app/server.py          dist/
-          cp windows-app/requirements.txt   dist/
-          cp windows-app/static/index.html  dist/static/
-
-          # bat files: convert LF -> CRLF
+          cp windows-app/server.py         dist/
+          cp windows-app/requirements.txt  dist/
+          cp windows-app/static/index.html dist/static/
           sed 's/$/\r/' windows-app/start.bat           > dist/start.bat
           sed 's/$/\r/' windows-app/download_models.bat > dist/download_models.bat
-
-          # sd-server binary + DLLs
           cp sd_bin/*.exe dist/ 2>/dev/null || true
           cp sd_bin/*.dll dist/ 2>/dev/null || true
 
-          # README
           cat > dist/README.txt << 'EOF'
           Z-Image Generator
           =================
-          First time:
-            1. Run download_models.bat  (downloads ~6.3 GB, one-time only)
-               OR copy existing models into the folder you chose during install.
-            2. Run start.bat
-            3. Browser opens at http://localhost:8080
-
-          If models are already on your PC, just point to that folder
-          in the setup screen that appears on first launch.
+          1. Run start.bat (or use the Start Menu / Desktop shortcut)
+          2. Browser opens at http://localhost:8080
+          3. On first launch: enter your model folder path
+             (or run download_models.bat to download ~6.3 GB models)
           EOF
 
-          echo "dist contents:"
-          ls -lh dist/
-
-      - name: Install Python dependencies into dist
+      - name: Bundle Python dependencies
         shell: cmd
         run: |
-          python -m pip install -q -r dist\requirements.txt --target dist\lib
-          echo Done
+          python -m pip install --quiet -r dist\requirements.txt --target dist\lib
+          echo Bundled.
 
-      - name: Update start.bat to use bundled libs
+      - name: Install WiX Toolset v3
+        shell: cmd
+        run: choco install wixtoolset --version 3.14.1 -y --no-progress
+
+      - name: Create minimal license.rtf
         shell: bash
         run: |
-          # Prepend PYTHONPATH so bundled libs in dist/lib are found
-          sed -i 's|"%PYTHON%" "%~dp0server.py"|set "PYTHONPATH=%~dp0lib" \& "%PYTHON%" "%~dp0server.py"|' dist/start.bat || true
+          printf '{\\rtf1\\ansi MIT License. Free to use.}' > windows-app/license.rtf
 
-      - name: Install Inno Setup
-        shell: cmd
-        run: choco install innosetup -y --no-progress
-
-      - name: Build MSI-style installer
+      - name: Harvest dist directory with heat.exe
         shell: cmd
         run: |
-          copy windows-app\setup.iss setup.iss
-          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
-          dir installer_out\
+          set PATH=%PATH%;C:\Program Files (x86)\WiX Toolset v3.14\bin
+          heat.exe dir dist ^
+            -cg DistComponents ^
+            -dr INSTALLFOLDER ^
+            -gg -g1 -srd -sfrag ^
+            -var var.DistDir ^
+            -out dist_components.wxs
+          type dist_components.wxs
 
-      - name: Upload installer
+      - name: Compile with candle.exe
+        shell: cmd
+        run: |
+          set PATH=%PATH%;C:\Program Files (x86)\WiX Toolset v3.14\bin
+          candle.exe ^
+            -dDistDir=dist ^
+            -arch x64 ^
+            -ext WixUIExtension ^
+            windows-app\setup.wxs ^
+            dist_components.wxs
+          dir *.wixobj
+
+      - name: Link with light.exe → .msi
+        shell: cmd
+        run: |
+          set PATH=%PATH%;C:\Program Files (x86)\WiX Toolset v3.14\bin
+          light.exe ^
+            -ext WixUIExtension ^
+            -b dist ^
+            -dDistDir=dist ^
+            windows-app\license.rtf ^
+            setup.wixobj dist_components.wixobj ^
+            -o ZImageGen_Setup.msi
+          dir ZImageGen_Setup.msi
+
+      - name: Upload MSI
         uses: actions/upload-artifact@v4
         with:
-          name: ZImageGen-Installer-${{ steps.sd_release.outputs.tag }}
-          path: installer_out\ZImageGen_Setup_*.exe
+          name: ZImageGen-MSI-${{ steps.sd_release.outputs.tag }}
+          path: ZImageGen_Setup.msi
           retention-days: 30
