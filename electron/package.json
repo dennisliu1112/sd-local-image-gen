@@ -1,0 +1,32 @@
+{
+  "name": "zimage-generator",
+  "version": "1.0.0",
+  "description": "Z-Image Generator — local AI image generation",
+  "main": "main.js",
+  "author": "ZImageGen",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "tree-kill": "^1.2.2"
+  },
+  "build": {
+    "appId": "com.finetek.zimagegen",
+    "productName": "ZImageGen",
+    "directories": { "output": "release" },
+    "files": ["main.js", "package.json"],
+    "extraResources": [
+      { "from": "../server_dist/server", "to": "server", "filter": ["**/*"] }
+    ],
+    "win": {
+      "target": [{ "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.ico"
+    }
+  }
+}

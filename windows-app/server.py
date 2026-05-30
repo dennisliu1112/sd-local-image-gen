@@ -356,10 +356,43 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+def _pid_alive(pid: int) -> bool:
+    try:
+        if os.name == "nt":
+            import ctypes
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if not h:
+                return False
+            ctypes.windll.kernel32.CloseHandle(h)
+            return True
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
+
+def _watch_parent():
+    """Exit (killing sd-server) if the Electron parent dies — covers the
+    case where Electron is force-killed and its JS cleanup never runs."""
+    ppid_env = os.environ.get("ELECTRON_PID")
+    watch_pid = int(ppid_env) if ppid_env and ppid_env.isdigit() else None
+    while True:
+        time.sleep(3)
+        orphaned = (os.name != "nt" and os.getppid() == 1)
+        gone = (watch_pid is not None and not _pid_alive(watch_pid))
+        if orphaned or gone:
+            log.info("Parent process gone — shutting down backend.")
+            _shutdown()
+            os._exit(0)
+
+
 @app.on_event("startup")
 def startup():
     threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=start_sd_server, daemon=True).start()
+    if os.environ.get("ELECTRON_PID") or getattr(sys, "frozen", False):
+        threading.Thread(target=_watch_parent, daemon=True).start()
 
 
 @app.on_event("shutdown")
@@ -622,42 +655,23 @@ def _shutdown():
         pass
 
 
-def _open_window():
-    """Open the native app window; fall back to the system browser if the
-    webview backend can't start. Writes a crash log next to the exe."""
-    url = f"http://127.0.0.1:{API_PORT}"
-    threading.Thread(target=_serve, daemon=True).start()
-    _wait_health()
-    try:
-        import webview
-        log.info("Opening native window via pywebview…")
-        webview.create_window("Z-Image Generator", url,
-                              width=1180, height=820, min_size=(900, 640))
-        webview.start()              # blocks until the window is closed
+def _install_signal_shutdown():
+    """Terminate sd-server when this process is asked to stop (Electron sends
+    SIGTERM / taskkill on app close)."""
+    import signal
+    def _handler(signum, frame):
+        log.info("Received signal %s — shutting down.", signum)
         _shutdown()
         os._exit(0)
-    except Exception:
-        import traceback, webbrowser
-        tb = traceback.format_exc()
-        try:
-            (APP_DIR / "ZImageGen_error.log").write_text(
-                "pywebview failed to open a window; opened the browser instead.\n\n" + tb,
-                encoding="utf-8")
-        except Exception:
-            pass
-        log.error("pywebview failed; falling back to browser:\n%s", tb)
-        try: webbrowser.open(url)
+    for s in (signal.SIGTERM, signal.SIGINT):
+        try: signal.signal(s, _handler)
         except Exception: pass
-        try:
-            while True:
-                time.sleep(3600)     # keep server alive for the browser
-        finally:
-            _shutdown()
 
 
 if __name__ == "__main__":
-    # Frozen .exe (or ZIMAGE_UI=1) → desktop window. Else headless (dev).
-    if getattr(sys, "frozen", False) or os.environ.get("ZIMAGE_UI") == "1":
-        _open_window()
-    else:
-        _serve()
+    # Headless backend. The Electron shell owns the window and lifecycle;
+    # it spawns this process and kills it (tree-kill) when the app closes.
+    _install_signal_shutdown()
+    import atexit
+    atexit.register(_shutdown)
+    _serve()

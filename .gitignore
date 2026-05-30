@@ -53,3 +53,10 @@ windows-app/sd-server
 windows-app/output/
 windows-app/logs/
 windows-app/python/
+
+# Electron / build artifacts
+electron/node_modules/
+electron/release/
+server_dist/
+build_pyi/
+*.spec

@@ -1,10 +1,11 @@
-name: Build Windows App
+name: Build Windows App (Electron)
 
 on:
   push:
     branches: [master]
     paths:
       - 'windows-app/**'
+      - 'electron/**'
       - '.github/workflows/build-windows.yml'
   workflow_dispatch:
 
@@ -19,6 +20,29 @@ jobs:
         with:
           python-version: '3.12'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # --- Python backend → PyInstaller onedir -----------------------------
+      - name: Install Python deps + PyInstaller
+        shell: cmd
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r windows-app\requirements.txt pyinstaller
+
+      - name: Build backend (PyInstaller onedir)
+        shell: cmd
+        run: |
+          pyinstaller --noconfirm --clean ^
+            --distpath server_dist --workpath build_pyi --specpath build_pyi ^
+            --name server --onedir --console ^
+            --add-data "windows-app/static;static" ^
+            --collect-all uvicorn ^
+            windows-app\server.py
+          dir server_dist\server
+
+      # --- Bundle both sd-server engines next to the backend ---------------
       - name: Get latest stable-diffusion.cpp release
         id: sd_release
         shell: bash
@@ -42,68 +66,36 @@ jobs:
           echo "vurl=$(pick vulkan)" >> $GITHUB_OUTPUT
           echo "curl=$(pick avx2)"   >> $GITHUB_OUTPUT
 
-      - name: Download both engines (Vulkan + CPU)
+      - name: Download + place engines
         shell: bash
         run: |
           curl -L "${{ steps.sd_release.outputs.vurl }}" -o vulkan.zip
           curl -L "${{ steps.sd_release.outputs.curl }}" -o cpu.zip
-          unzip -j vulkan.zip "*.exe" "*.dll" -d engine-vulkan/
-          unzip -j cpu.zip    "*.exe" "*.dll" -d engine-cpu/
-          ls engine-vulkan/ engine-cpu/
+          unzip -j vulkan.zip "*.exe" "*.dll" -d server_dist/server/engine-vulkan/
+          unzip -j cpu.zip    "*.exe" "*.dll" -d server_dist/server/engine-cpu/
+          ls server_dist/server/engine-vulkan/ server_dist/server/engine-cpu/
 
-      - name: Install Python deps + PyInstaller
+      # --- Electron shell → electron-builder win zip -----------------------
+      - name: Install Electron deps
         shell: cmd
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r windows-app\requirements.txt pyinstaller
+        working-directory: electron
+        run: npm ci
 
-      - name: Build app (PyInstaller)
+      - name: Build Electron app (Windows zip)
         shell: cmd
-        run: |
-          pyinstaller --noconfirm --clean ^
-            --name ZImageGen ^
-            --console ^
-            --add-data "windows-app/static;static" ^
-            --collect-all webview ^
-            --collect-all clr_loader ^
-            --collect-all pythonnet ^
-            --copy-metadata pywebview ^
-            --hidden-import clr ^
-            windows-app\server.py
-          dir dist\ZImageGen
+        working-directory: electron
+        run: npx electron-builder --win zip --x64
 
-      - name: Assemble distribution folder
+      - name: Stage release + README
         shell: bash
         run: |
-          APP=dist/ZImageGen
-          mkdir -p "$APP/engine-vulkan" "$APP/engine-cpu" "$APP/models"
-          cp engine-vulkan/* "$APP/engine-vulkan/" 2>/dev/null || true
-          cp engine-cpu/*    "$APP/engine-cpu/"    2>/dev/null || true
-          cat > "$APP/README.txt" << 'EOF'
-          Z-Image Generator
-          =================
-          Double-click ZImageGen.exe — no install, no admin needed.
-
-          IMPORTANT: keep this folder in an English-only path (e.g. C:\ZImageGen).
-          Avoid Chinese folders, Desktop (桌面), or OneDrive.
-
-          First launch: a setup screen lets you pick your model folder, or
-          download the models (~6.3 GB). Closing the window stops everything.
-          EOF
-          ls -la "$APP"
-
-      - name: Zip
-        shell: bash
-        run: |
-          TAG="${{ steps.sd_release.outputs.tag }}"
-          cd dist
-          7z a -tzip "../ZImageGen_Windows_${TAG}.zip" ZImageGen >/dev/null
-          cd ..
-          ls -lh ZImageGen_Windows_*.zip
+          mkdir -p out
+          cp electron/release/*.zip "out/" 2>/dev/null || true
+          ls -lh out/
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: ZImageGen-Windows-${{ steps.sd_release.outputs.tag }}
-          path: ZImageGen_Windows_*.zip
+          path: out/*.zip
           retention-days: 30
