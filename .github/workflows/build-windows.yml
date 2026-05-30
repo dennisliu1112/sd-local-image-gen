@@ -77,13 +77,14 @@ jobs:
 
       - name: Create license.rtf
         shell: bash
-        run: printf '{\\rtf1\\ansi MIT License. Free to use.}' > windows-app/license.rtf
+        run: printf '{\\rtf1\\ansi MIT License. Free to use.}' > license.rtf
 
       - name: Build MSI
         shell: cmd
         run: |
           wix build windows-app\setup.wxs ^
-            -dDistDir=dist ^
+            -d DistDir=dist ^
+            -d LicenseRtf=license.rtf ^
             -ext WixToolset.UI.wixext ^
             -arch x64 ^
             -o ZImageGen_Setup.msi
