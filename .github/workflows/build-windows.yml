@@ -62,18 +62,28 @@ jobs:
               print(a['browser_download_url']); break
           "
           }
-          echo "tag=$TAG"            >> $GITHUB_OUTPUT
-          echo "vurl=$(pick vulkan)" >> $GITHUB_OUTPUT
-          echo "curl=$(pick avx2)"   >> $GITHUB_OUTPUT
+          echo "tag=$TAG"               >> $GITHUB_OUTPUT
+          echo "vurl=$(pick vulkan)"     >> $GITHUB_OUTPUT
+          echo "curl=$(pick avx2)"       >> $GITHUB_OUTPUT
+          echo "cudaurl=$(pick cuda12)"  >> $GITHUB_OUTPUT
+          echo "cudarturl=$(pick cudart)">> $GITHUB_OUTPUT
 
       - name: Download + place engines
         shell: bash
         run: |
-          curl -L "${{ steps.sd_release.outputs.vurl }}" -o vulkan.zip
-          curl -L "${{ steps.sd_release.outputs.curl }}" -o cpu.zip
-          unzip -j vulkan.zip "*.exe" "*.dll" -d server_dist/server/engine-vulkan/
-          unzip -j cpu.zip    "*.exe" "*.dll" -d server_dist/server/engine-cpu/
-          ls server_dist/server/engine-vulkan/ server_dist/server/engine-cpu/
+          S=server_dist/server
+          curl -L "${{ steps.sd_release.outputs.vurl }}"     -o vulkan.zip
+          curl -L "${{ steps.sd_release.outputs.curl }}"     -o cpu.zip
+          curl -L "${{ steps.sd_release.outputs.cudaurl }}"  -o cuda.zip
+          curl -L "${{ steps.sd_release.outputs.cudarturl }}" -o cudart.zip
+          unzip -j vulkan.zip "*.exe" "*.dll" -d "$S/engine-vulkan/"
+          unzip -j cpu.zip    "*.exe" "*.dll" -d "$S/engine-cpu/"
+          # CUDA engine = cuda12 build + CUDA runtime DLLs in the same folder
+          unzip -j cuda.zip   "*.exe" "*.dll" -d "$S/engine-cuda/"
+          unzip -j cudart.zip "*.dll"         -d "$S/engine-cuda/"
+          echo "=== cuda ==="; ls "$S/engine-cuda/"
+          echo "=== vulkan ==="; ls "$S/engine-vulkan/"
+          echo "=== cpu ==="; ls "$S/engine-cpu/"
 
       # --- Electron shell → electron-builder win zip -----------------------
       - name: Install Electron deps

@@ -365,7 +365,8 @@ async function checkReady() {
     const text = document.getElementById('status-text');
     if (d.sd_server_ready) {
       dot.className  = 'ready';
-      text.textContent = d.engine === 'cpu' ? '就緒（CPU 模式，較慢）' : '就緒';
+      const eng = { cuda: 'CUDA GPU', vulkan: 'Vulkan GPU', gpu: 'GPU', cpu: 'CPU（較慢）' }[d.engine] || '';
+      text.textContent = eng ? `就緒 · ${eng}` : '就緒';
       window.__engine = d.engine;
       document.getElementById('gen-btn').disabled = false;
     } else {

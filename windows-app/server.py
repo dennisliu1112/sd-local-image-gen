@@ -54,11 +54,13 @@ CONFIG_FILE = ROOT / "config.json"
 OUTPUT_DIR.mkdir(exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
 
-# Engine candidates, tried in order: GPU first, then CPU fallback.
+# Engine candidates, tried in order: fastest GPU first, then CPU fallback.
 # Each engine lives in its own folder (own DLLs) to avoid conflicts.
 def engine_candidates():
     out = []
-    for label, sub in (("gpu", "engine-vulkan"), ("cpu", "engine-cpu")):
+    for label, sub in (("cuda", "engine-cuda"),
+                       ("vulkan", "engine-vulkan"),
+                       ("cpu", "engine-cpu")):
         exe = ROOT / sub / EXE_NAME
         if exe.exists():
             out.append((label, exe))
@@ -172,8 +174,10 @@ def _build_cmd(label, exe) -> list:
     ]
     if sys.platform == "darwin":
         cmd.append("--vae-on-cpu")          # Metal VAE precision bug
-    if label == "gpu" and os.name == "nt":
+    if label != "cpu" and os.name == "nt":
         cmd.append("--offload-to-cpu")      # keep weights in RAM (low VRAM)
+    if label == "cuda":
+        cmd.append("--diffusion-fa")        # flash attention: smaller VRAM buffer
     return cmd
 
 
@@ -347,10 +351,11 @@ def worker():
 
         ok, r, err = _try_generate()
 
-        # GPU likely ran out of VRAM on this resolution — fall back to CPU and retry.
-        if not ok and sd_status.get("engine") == "gpu" and current_idx < len(ENGINES) - 1:
-            log.warning("[%s] generation failed on GPU (%s) — switching to CPU…",
-                        job_id[:8], err[:80])
+        # A GPU engine likely ran out of VRAM on this resolution — fall back
+        # to the next engine (cuda→vulkan→cpu) and retry the same job.
+        if not ok and sd_status.get("engine") != "cpu" and current_idx < len(ENGINES) - 1:
+            log.warning("[%s] generation failed on %s engine (%s) — switching…",
+                        job_id[:8], sd_status.get("engine"), err[:80])
             job["status"] = "running"   # keep UI in 'generating' state
             if fallback_to_next_engine():
                 t0 = time.monotonic()   # reset timer for the CPU attempt
