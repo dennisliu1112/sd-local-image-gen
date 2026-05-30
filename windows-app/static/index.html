@@ -196,9 +196,62 @@
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #2e2e40; border-radius: 99px; }
+
+  /* ── Setup overlay ── */
+  #setup-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 100;
+    background: #0f0f12;
+    align-items: center; justify-content: center;
+  }
+  #setup-overlay.show { display: flex; }
+  #setup-box {
+    background: #16161f;
+    border: 1px solid #2e2e40;
+    border-radius: 16px;
+    padding: 40px 48px;
+    width: 520px;
+    max-width: 95vw;
+  }
+  #setup-box h2 { font-size: 20px; color: #c8b8ff; margin-bottom: 8px; }
+  #setup-box p  { font-size: 13px; color: #666; margin-bottom: 28px; line-height: 1.6; }
+  .setup-field  { margin-bottom: 20px; }
+  .setup-field label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; }
+  .setup-field input {
+    width: 100%; background: #1a1a22; border: 1px solid #2e2e40;
+    border-radius: 8px; color: #e8e8ec; font-size: 13px;
+    padding: 10px 14px; outline: none;
+  }
+  .setup-field input:focus { border-color: #7c5cfc; }
+  .setup-hint { font-size: 11px; color: #444; margin-top: 5px; }
+  .setup-missing { font-size: 11px; color: #e05050; margin-top: 6px; }
+  #setup-save {
+    width: 100%; background: #7c5cfc; color: #fff; border: none;
+    border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-top: 8px; transition: background .2s;
+  }
+  #setup-save:hover { background: #9474ff; }
+  #setup-status { font-size: 12px; color: #888; text-align: center; margin-top: 12px; min-height: 18px; }
 </style>
 </head>
 <body>
+
+<!-- Setup overlay (shown when models missing) -->
+<div id="setup-overlay">
+  <div id="setup-box">
+    <h2>⚙️ Model Setup</h2>
+    <p>Models not found. Enter the folder path where your models are stored,<br>
+       or choose a location to download them (approx. 6.3 GB).</p>
+    <div class="setup-field">
+      <label>Model folder path</label>
+      <input type="text" id="setup-model-dir" placeholder="e.g. D:\AI\models">
+      <div class="setup-hint">Must contain: z_image_turbo-Q4_K.gguf, ae.safetensors, Qwen3-4B-Q4_K_M.gguf</div>
+      <div class="setup-missing" id="setup-missing-list"></div>
+    </div>
+    <button id="setup-save" onclick="saveModelDir()">Save &amp; Continue</button>
+    <div id="setup-status"></div>
+  </div>
+</div>
 
 <header>
   <div id="status-dot"></div>
@@ -442,9 +495,48 @@ document.getElementById('prompt').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); }
 });
 
+// ── Model setup ────────────────────────────────────────────────────────────
+async function checkModels() {
+  try {
+    const r = await fetch(`${API}/config`);
+    const d = await r.json();
+    document.getElementById('setup-model-dir').value = d.model_dir || '';
+    if (!d.models_ready) {
+      if (d.missing && d.missing.length)
+        document.getElementById('setup-missing-list').textContent = 'Missing: ' + d.missing.join(', ');
+      document.getElementById('setup-overlay').classList.add('show');
+      return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
+async function saveModelDir() {
+  const dir = document.getElementById('setup-model-dir').value.trim();
+  if (!dir) return;
+  document.getElementById('setup-status').textContent = 'Saving...';
+  try {
+    const r = await fetch(`${API}/config`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({model_dir: dir})
+    });
+    const d = await r.json();
+    if (d.models_ready) {
+      document.getElementById('setup-overlay').classList.remove('show');
+      document.getElementById('setup-status').textContent = '';
+      checkReady();
+    } else {
+      const cfg = await (await fetch(`${API}/config`)).json();
+      document.getElementById('setup-missing-list').textContent = 'Missing: ' + (cfg.missing||[]).join(', ');
+      document.getElementById('setup-status').textContent = 'Models not found in that folder.';
+    }
+  } catch(e) { document.getElementById('setup-status').textContent = 'Error: ' + e.message; }
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
-checkReady();
 document.getElementById('gen-btn').disabled = true;
+checkModels().then(ok => { if (ok) checkReady(); });
 </script>
 </body>
 </html>

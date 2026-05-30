@@ -33,20 +33,51 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
-# Paths — resolved relative to this script so it works from any directory
+# Paths
 # ---------------------------------------------------------------------------
 ROOT       = Path(__file__).parent
 EXE        = ROOT / ("sd-server.exe" if os.name == "nt" else "sd-server")
-MODEL_DIR  = ROOT / "models"
-DIFF_MODEL = MODEL_DIR / "z_image_turbo-Q4_K.gguf"
-VAE_MODEL  = MODEL_DIR / "ae.safetensors"
-LLM_MODEL  = MODEL_DIR / "Qwen3-4B-Q4_K_M.gguf"
 OUTPUT_DIR = ROOT / "output"
 LOG_DIR    = ROOT / "logs"
 STATIC_DIR = ROOT / "static"
+CONFIG_FILE = ROOT / "config.json"
 
 OUTPUT_DIR.mkdir(exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
+
+# ---------------------------------------------------------------------------
+# Config — model_dir can be set by installer or user at any time
+# ---------------------------------------------------------------------------
+DEFAULT_MODEL_DIR = ROOT / "models"
+
+def load_config() -> dict:
+    if CONFIG_FILE.exists():
+        try:
+            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+def save_config(cfg: dict):
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def get_model_dir() -> Path:
+    cfg = load_config()
+    p = cfg.get("model_dir")
+    return Path(p) if p else DEFAULT_MODEL_DIR
+
+def model_paths():
+    d = get_model_dir()
+    return {
+        "dir":  d,
+        "diff": d / "z_image_turbo-Q4_K.gguf",
+        "vae":  d / "ae.safetensors",
+        "llm":  d / "Qwen3-4B-Q4_K_M.gguf",
+    }
+
+def models_ready() -> bool:
+    m = model_paths()
+    return m["diff"].exists() and m["vae"].exists() and m["llm"].exists()
 
 SD_PORT            = int(os.environ.get("SD_SERVER_PORT", "8190"))
 SD_URL             = f"http://127.0.0.1:{SD_PORT}"
@@ -70,16 +101,17 @@ sd_server_proc = None
 def start_sd_server() -> bool:
     global sd_server_proc
 
-    missing = [str(p) for p in [EXE, DIFF_MODEL, VAE_MODEL, LLM_MODEL] if not p.exists()]
+    m = model_paths()
+    missing = [str(p) for p in [EXE, m["diff"], m["vae"], m["llm"]] if not p.exists()]
     if missing:
         log.error("Missing files: %s", missing)
         return False
 
     cmd = [
         str(EXE),
-        "--diffusion-model", str(DIFF_MODEL),
-        "--vae",             str(VAE_MODEL),
-        "--llm",             str(LLM_MODEL),
+        "--diffusion-model", str(m["diff"]),
+        "--vae",             str(m["vae"]),
+        "--llm",             str(m["llm"]),
         "--vae-tiling",
         "--listen-port", str(SD_PORT),
         "--listen-ip",   "127.0.0.1",
@@ -284,13 +316,43 @@ def delete_job(job_id: str):
 
 @app.get("/health")
 def health():
+    m = model_paths()
     return {
         "status": "ok",
         "sd_server_ready": sd_alive(),
+        "models_ready": models_ready(),
+        "model_dir": str(m["dir"]),
         "queue_depth": job_queue.qsize(),
         "running_jobs": sum(1 for j in jobs.values() if j["status"] == RUNNING),
         "total_jobs": len(jobs),
     }
+
+
+class ConfigRequest(BaseModel):
+    model_dir: str
+
+@app.get("/config")
+def get_config_endpoint():
+    cfg = load_config()
+    m = model_paths()
+    return {
+        "model_dir": str(m["dir"]),
+        "models_ready": models_ready(),
+        "missing": [
+            f for f, p in [("z_image_turbo-Q4_K.gguf", m["diff"]),
+                           ("ae.safetensors", m["vae"]),
+                           ("Qwen3-4B-Q4_K_M.gguf", m["llm"])]
+            if not p.exists()
+        ],
+    }
+
+@app.post("/config")
+def set_config_endpoint(req: ConfigRequest):
+    p = Path(req.model_dir)
+    cfg = load_config()
+    cfg["model_dir"] = str(p)
+    save_config(cfg)
+    return {"model_dir": str(p), "models_ready": models_ready()}
 
 
 @app.get("/")
