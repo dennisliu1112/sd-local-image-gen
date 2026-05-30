@@ -17,11 +17,13 @@ jobs:
 
       - name: Get latest stable-diffusion.cpp release
         id: sd_release
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          RELEASE=$(curl -s https://api.github.com/repos/leejet/stable-diffusion.cpp/releases/latest)
-          TAG=$(echo "$RELEASE" | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
-          URL=$(echo "$RELEASE" | python3 -c "
+          INFO=$(gh release view --repo leejet/stable-diffusion.cpp --json tagName,assets)
+          TAG=$(echo "$INFO" | python -c "import sys,json; print(json.load(sys.stdin)['tagName'])")
+          URL=$(echo "$INFO" | python -c "
           import sys,json
           d=json.load(sys.stdin)
           for a in d['assets']:
@@ -32,9 +34,11 @@ jobs:
             n=a['name']
             if 'win' in n and 'avx2' in n and 'x64' in n and n.endswith('.zip'):
               print(a['browser_download_url']); exit()
+          print('')
           ")
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "url=$URL"  >> $GITHUB_OUTPUT
+          echo "Release: $TAG"
 
       - name: Download sd-server Vulkan binary
         shell: bash
