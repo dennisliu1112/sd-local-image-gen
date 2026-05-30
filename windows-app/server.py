@@ -133,10 +133,57 @@ def _short_path(p: Path) -> str:
     return sp
 
 
-def start_sd_server() -> bool:
-    """Try each engine (GPU first, then CPU). Auto-fall-back when an engine
-    crashes — e.g. Vulkan OOM on a low-VRAM iGPU drops to the CPU build."""
+ENGINES: list = []      # populated at startup: [(label, exe), ...]
+current_idx = -1        # index into ENGINES of the running engine
+
+
+def _build_cmd(label, exe) -> list:
+    m = model_paths()
+    cmd = [
+        str(exe),
+        "--diffusion-model", _short_path(m["diff"]),
+        "--vae",             _short_path(m["vae"]),
+        "--llm",             _short_path(m["llm"]),
+        "--vae-tiling",
+        "--listen-port", str(SD_PORT),
+        "--listen-ip",   "127.0.0.1",
+    ]
+    if sys.platform == "darwin":
+        cmd.append("--vae-on-cpu")          # Metal VAE precision bug
+    if label == "gpu" and os.name == "nt":
+        cmd.append("--offload-to-cpu")      # keep weights in RAM (low VRAM)
+    return cmd
+
+
+def _launch(label, exe) -> bool:
+    """Start sd-server for one engine and wait until it answers HTTP.
+    Returns True if the server came up, False if it exited or timed out."""
     global sd_server_proc
+    log_path = LOG_DIR / "sd_server.log"
+    log.info("Starting sd-server [%s engine] on port %d …", label, SD_PORT)
+    sd_status["state"]  = "starting"
+    sd_status["engine"] = label
+    sd_server_proc = subprocess.Popen(
+        _build_cmd(label, exe),
+        stdout=open(log_path, "w", encoding="utf-8"), stderr=subprocess.STDOUT,
+    )
+    for _ in range(SD_READY_TIMEOUT):
+        time.sleep(1)
+        try:
+            if httpx.get(f"{SD_URL}/", timeout=2).status_code == 200:
+                return True
+        except Exception:
+            pass
+        if sd_server_proc.poll() is not None:
+            return False
+    try: sd_server_proc.terminate()
+    except Exception: pass
+    return False
+
+
+def start_sd_server() -> bool:
+    """Bring up the first engine that loads (GPU first, then CPU)."""
+    global ENGINES, current_idx
 
     m = model_paths()
     missing = [str(p) for p in [m["diff"], m["vae"], m["llm"]] if not p.exists()]
@@ -146,71 +193,45 @@ def start_sd_server() -> bool:
         log.error("Missing files: %s", missing)
         return False
 
-    engines = engine_candidates()
-    if not engines:
+    ENGINES = engine_candidates()
+    if not ENGINES:
         sd_status["state"] = "crashed"
         sd_status["error"] = "找不到 sd-server 執行檔（engine-vulkan / engine-cpu）"
-        log.error("No engine executable found")
         return False
 
-    log_path = LOG_DIR / "sd_server.log"
-    last_tail = ""
-
-    for idx, (label, exe) in enumerate(engines):
-        is_last = idx == len(engines) - 1
-        cmd = [
-            str(exe),
-            "--diffusion-model", _short_path(m["diff"]),
-            "--vae",             _short_path(m["vae"]),
-            "--llm",             _short_path(m["llm"]),
-            "--vae-tiling",
-            "--listen-port", str(SD_PORT),
-            "--listen-ip",   "127.0.0.1",
-        ]
-        if sys.platform == "darwin":
-            cmd.append("--vae-on-cpu")          # Metal VAE precision bug
-        if label == "gpu" and os.name == "nt":
-            cmd.append("--offload-to-cpu")      # reduce VRAM on weak GPUs
-
-        log.info("Starting sd-server [%s engine] on port %d …", label, SD_PORT)
-        sd_status["state"]  = "starting"
-        sd_status["engine"] = label
-        sd_server_proc = subprocess.Popen(
-            cmd, stdout=open(log_path, "w", encoding="utf-8"), stderr=subprocess.STDOUT,
-        )
-
-        ready = exited = False
-        for i in range(SD_READY_TIMEOUT):
-            time.sleep(1)
-            try:
-                if httpx.get(f"{SD_URL}/", timeout=2).status_code == 200:
-                    ready = True
-                    break
-            except Exception:
-                pass
-            if sd_server_proc.poll() is not None:
-                exited = True
-                last_tail = _log_tail(log_path)
-                break
-
-        if ready:
-            log.info("sd-server ready [%s engine] after %ds", label, i + 1)
+    for idx, (label, exe) in enumerate(ENGINES):
+        if _launch(label, exe):
+            current_idx = idx
             sd_status["state"] = "ready"
+            log.info("sd-server ready [%s engine]", label)
             return True
-
-        if not exited:                          # timed out → kill it
-            last_tail = "sd-server did not become ready in time"
-            try: sd_server_proc.terminate()
-            except Exception: pass
-
-        log.error("sd-server [%s engine] failed.", label)
-        if not is_last:
-            log.warning("Falling back to next engine (likely out of VRAM)…")
-        # loop continues to the next engine
+        sd_status["error"] = _log_tail(LOG_DIR / "sd_server.log")
+        log.error("sd-server [%s engine] failed to start.", label)
+        if idx < len(ENGINES) - 1:
+            log.warning("Trying next engine…")
+        time.sleep(2)
 
     sd_status["state"] = "crashed"
-    sd_status["error"] = last_tail
-    log.error("All engines failed.\n%s", last_tail)
+    log.error("All engines failed to start.")
+    return False
+
+
+def fallback_to_next_engine() -> bool:
+    """Switch to the next engine after a generation failure (e.g. GPU OOM on
+    a large image). Restarts sd-server on that engine. True if it came up."""
+    global current_idx
+    for idx in range(current_idx + 1, len(ENGINES)):
+        label, exe = ENGINES[idx]
+        log.warning("Generation failed — switching to [%s engine]…", label)
+        try:
+            if sd_server_proc: sd_server_proc.terminate()
+        except Exception: pass
+        time.sleep(2)
+        if _launch(label, exe):
+            current_idx = idx
+            sd_status["state"] = "ready"
+            log.info("Now running on [%s engine].", label)
+            return True
     return False
 
 
@@ -248,43 +269,59 @@ def worker():
             continue
 
         job["status"]     = RUNNING
-        job["started_at"] = datetime.utcnow().isoformat()
+        job["started_at"] = datetime.now().isoformat()
         log.info("[%s] start: %s…", job_id[:8], job["prompt"][:60])
 
         out_path = OUTPUT_DIR / f"{job_id}.png"
         t0 = time.monotonic()
 
-        try:
-            payload = {
-                "prompt":          job["prompt"],
-                "negative_prompt": job.get("negative_prompt", ""),
-                "width":           job["width"],
-                "height":          job["height"],
-                "steps":           job["steps"],
-                "cfg_scale":       job["cfg_scale"],
-                "seed":            job["seed"],
-                "batch_size":      1,
-                "save_images":     True,
-            }
-            r = httpx.post(f"{SD_URL}/sdapi/v1/txt2img", json=payload, timeout=3600)
-            elapsed = time.monotonic() - t0
+        payload = {
+            "prompt":          job["prompt"],
+            "negative_prompt": job.get("negative_prompt", ""),
+            "width":           job["width"],
+            "height":          job["height"],
+            "steps":           job["steps"],
+            "cfg_scale":       job["cfg_scale"],
+            "seed":            job["seed"],
+            "batch_size":      1,
+            "save_images":     True,
+        }
 
-            if r.status_code == 200:
-                img_b64 = r.json()["images"][0]
-                out_path.write_bytes(base64.b64decode(img_b64))
-                job["status"]           = DONE
-                job["output_file"]      = str(out_path)
-                job["duration_seconds"] = round(elapsed, 1)
-                log.info("[%s] done in %.1fs", job_id[:8], elapsed)
-            else:
-                job["status"] = FAILED
-                job["error"]  = f"sd-server {r.status_code}: {r.text[:200]}"
-        except Exception as exc:
+        def _try_generate():
+            """Returns (ok, response_or_none, error_str)."""
+            try:
+                resp = httpx.post(f"{SD_URL}/sdapi/v1/txt2img", json=payload, timeout=3600)
+                return (resp.status_code == 200, resp, "" if resp.status_code == 200
+                        else f"sd-server {resp.status_code}: {resp.text[:200]}")
+            except Exception as e:
+                return (False, None, str(e))
+
+        ok, r, err = _try_generate()
+
+        # GPU likely ran out of VRAM on this resolution — fall back to CPU and retry.
+        if not ok and sd_status.get("engine") == "gpu" and current_idx < len(ENGINES) - 1:
+            log.warning("[%s] generation failed on GPU (%s) — switching to CPU…",
+                        job_id[:8], err[:80])
+            job["status"] = "running"   # keep UI in 'generating' state
+            if fallback_to_next_engine():
+                t0 = time.monotonic()   # reset timer for the CPU attempt
+                ok, r, err = _try_generate()
+
+        elapsed = time.monotonic() - t0
+        if ok and r is not None:
+            img_b64 = r.json()["images"][0]
+            out_path.write_bytes(base64.b64decode(img_b64))
+            job["status"]           = DONE
+            job["output_file"]      = str(out_path)
+            job["duration_seconds"] = round(elapsed, 1)
+            job["engine"]           = sd_status.get("engine", "")
+            log.info("[%s] done in %.1fs on %s", job_id[:8], elapsed, sd_status.get("engine"))
+        else:
             job["status"] = FAILED
-            job["error"]  = str(exc)
-            log.error("[%s] error: %s", job_id[:8], exc)
+            job["error"]  = err
+            log.error("[%s] failed: %s", job_id[:8], err)
 
-        job["finished_at"] = datetime.utcnow().isoformat()
+        job["finished_at"] = datetime.now().isoformat()
         job_queue.task_done()
 
 
@@ -342,7 +379,7 @@ def generate(req: GenerateRequest):
         "steps":      req.steps,
         "cfg_scale":  req.cfg_scale,
         "seed":       req.seed,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now().isoformat(),
         "started_at": None,
         "finished_at": None,
         "output_file": None,
