@@ -68,9 +68,11 @@ jobs:
           # App files
           cp windows-app/server.py          pkg/
           cp windows-app/requirements.txt   pkg/
-          cp windows-app/start.bat          pkg/
-          cp windows-app/download_models.bat pkg/
           cp windows-app/static/index.html  pkg/static/
+
+          # Convert bat files to CRLF (written on Mac/Linux with LF)
+          sed 's/$/\r/' windows-app/start.bat           > pkg/start.bat
+          sed 's/$/\r/' windows-app/download_models.bat > pkg/download_models.bat
 
           # sd-server binary + DLLs
           cp sd_bin/*.exe pkg/ 2>/dev/null || true
