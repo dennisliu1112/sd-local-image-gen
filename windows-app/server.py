@@ -177,10 +177,37 @@ def _build_cmd(label, exe) -> list:
     return cmd
 
 
+def _kill_port(port: int):
+    """Kill whatever is listening on `port` — clears a stale sd-server left
+    behind by a previous crash / force-kill so a fresh start is clean."""
+    try:
+        if os.name == "nt":
+            out = subprocess.run(["netstat", "-ano", "-p", "tcp"],
+                                 capture_output=True, text=True).stdout
+            pids = {ln.split()[-1] for ln in out.splitlines()
+                    if (":%d " % port) in ln and "LISTENING" in ln}
+            for pid in pids:
+                if pid.isdigit():
+                    subprocess.run(["taskkill", "/PID", pid, "/F"], capture_output=True)
+                    log.warning("Cleared stale process %s on port %d", pid, port)
+        else:
+            out = subprocess.run(["lsof", "-ti", "tcp:%d" % port],
+                                 capture_output=True, text=True).stdout
+            for pid in out.split():
+                try:
+                    os.kill(int(pid), 9)
+                    log.warning("Cleared stale process %s on port %d", pid, port)
+                except Exception:
+                    pass
+    except Exception as e:
+        log.warning("port cleanup on %d failed: %s", port, e)
+
+
 def _launch(label, exe) -> bool:
     """Start sd-server for one engine and wait until it answers HTTP.
     Returns True if the server came up, False if it exited or timed out."""
     global sd_server_proc
+    _kill_port(SD_PORT)              # ensure no stale engine holds the port
     log_path = LOG_DIR / "sd_server.log"
     log.info("Starting sd-server [%s engine] on port %d …", label, SD_PORT)
     sd_status["state"]  = "starting"
