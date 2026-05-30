@@ -174,8 +174,13 @@ def _build_cmd(label, exe) -> list:
     ]
     if sys.platform == "darwin":
         cmd.append("--vae-on-cpu")          # Metal VAE precision bug
-    if label != "cpu" and os.name == "nt":
-        cmd.append("--offload-to-cpu")      # keep weights in RAM (low VRAM)
+    if label != "cpu":
+        # Graph-cut segmented execution: auto-detect free VRAM (keep 1 GiB
+        # for the desktop) and split large compute graphs to fit — lets a
+        # 4 GB card render 1024+ without OOM instead of failing outright.
+        cmd += ["--max-vram", "-1.0"]
+        if os.name == "nt":
+            cmd.append("--offload-to-cpu")  # weights stream from RAM
     if label == "cuda":
         cmd.append("--diffusion-fa")        # flash attention: smaller VRAM buffer
     return cmd
