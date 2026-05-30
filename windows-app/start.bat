@@ -10,9 +10,15 @@ set "PYTHONPATH=%~dp0lib"
 
 echo Starting Z-Image Generator...
 echo.
-echo  Open in browser: http://localhost:8080
-echo  Press Ctrl+C to stop.
+echo  The browser will open automatically once the server is ready.
+echo  (Model loading takes ~15-60 seconds on first launch.)
+echo  Press Ctrl+C in this window to stop.
 echo.
-start "" "http://localhost:8080"
+
+:: Background waiter: open browser only after the server responds
+start "" powershell -NoProfile -WindowStyle Hidden -Command ^
+  "do { Start-Sleep -Milliseconds 800; try { $r = Invoke-WebRequest 'http://localhost:8080/health' -UseBasicParsing -TimeoutSec 2 } catch {} } until ($r.StatusCode -eq 200); Start-Process 'http://localhost:8080'"
+
+:: Run server in foreground (Ctrl+C stops it)
 "%PYTHON%" "%~dp0server.py"
 pause

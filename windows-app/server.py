@@ -328,6 +328,31 @@ def health():
     }
 
 
+@app.get("/loadprogress")
+def loadprogress():
+    """Parse sd_server.log to estimate model-loading progress (tensor count)."""
+    import re
+    log_path = LOG_DIR / "sd_server.log"
+    if not log_path.exists():
+        return {"phase": "starting", "pct": 0}
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return {"phase": "starting", "pct": 0}
+
+    if "model files processing completed" in text or "loading tensors completed" in text:
+        # tensors loaded; sd-server is finishing init (Metal/Vulkan warmup)
+        return {"phase": "warmup", "pct": 99}
+
+    matches = re.findall(r"(\d+)/(\d+)", text)
+    if matches:
+        loaded, total = int(matches[-1][0]), int(matches[-1][1])
+        if total > 0:
+            return {"phase": "loading", "pct": min(98, round(loaded / total * 100)),
+                    "loaded": loaded, "total": total}
+    return {"phase": "starting", "pct": 0}
+
+
 class ConfigRequest(BaseModel):
     model_dir: str
 

@@ -334,10 +334,18 @@ async function checkReady() {
       text.textContent = '就緒';
       document.getElementById('gen-btn').disabled = false;
     } else {
-      dot.className  = '';
-      text.textContent = '模型載入中…';
+      dot.className  = 'busy';
       document.getElementById('gen-btn').disabled = true;
-      setTimeout(checkReady, 3000);
+      // show model-loading percentage
+      let label = '模型載入中…';
+      try {
+        const lp = await (await fetch(`${API}/loadprogress`)).json();
+        if (lp.phase === 'loading' && lp.pct) label = `模型載入中… ${lp.pct}%`;
+        else if (lp.phase === 'warmup')        label = '模型載入中… 即將完成';
+        else                                   label = '伺服器啟動中…';
+      } catch {}
+      text.textContent = label;
+      setTimeout(checkReady, 1500);
     }
   } catch {
     const dot = document.getElementById('status-dot');
