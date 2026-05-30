@@ -72,8 +72,8 @@ jobs:
       - name: Install WiX v4
         shell: cmd
         run: |
-          dotnet tool install --global wix
-          wix extension add WixToolset.UI.wixext/4.*
+          dotnet tool install --global wix --version 4.0.5
+          wix extension add WixToolset.UI.wixext/4.0.5
 
       - name: Create license.rtf
         shell: bash
