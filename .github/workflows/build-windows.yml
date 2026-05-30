@@ -79,11 +79,19 @@ jobs:
         shell: bash
         run: printf '{\\rtf1\\ansi MIT License. Free to use.}' > license.rtf
 
+      - name: Harvest dist directory
+        shell: cmd
+        run: |
+          wix harvest dir dist ^
+            -cg DistComponents ^
+            -dr INSTALLFOLDER ^
+            -o dist_components.wxs
+          type dist_components.wxs
+
       - name: Build MSI
         shell: cmd
         run: |
-          wix build windows-app\setup.wxs ^
-            -d DistDir=dist ^
+          wix build windows-app\setup.wxs dist_components.wxs ^
             -d LicenseRtf=license.rtf ^
             -ext WixToolset.UI.wixext ^
             -arch x64 ^

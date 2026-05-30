@@ -63,12 +63,5 @@
 
   </Package>
 
-  <Fragment>
-    <ComponentGroup Id="DistComponents"
-                    Directory="INSTALLFOLDER"
-                    Source="$(var.DistDir)">
-      <Files Include="**" />
-    </ComponentGroup>
-  </Fragment>
 
 </Wix>
