@@ -334,16 +334,23 @@ async function checkReady() {
       text.textContent = '就緒';
       document.getElementById('gen-btn').disabled = false;
     } else {
-      dot.className  = 'busy';
       document.getElementById('gen-btn').disabled = true;
-      // show model-loading percentage
+      // check load progress / crash
+      let lp = {};
+      try { lp = await (await fetch(`${API}/loadprogress`)).json(); } catch {}
+
+      if (lp.phase === 'crashed') {
+        dot.className = 'error';
+        text.textContent = 'sd-server 啟動失敗';
+        showCrash(lp.error || '');
+        return;   // stop polling; show error
+      }
+
+      dot.className = 'busy';
       let label = '模型載入中…';
-      try {
-        const lp = await (await fetch(`${API}/loadprogress`)).json();
-        if (lp.phase === 'loading' && lp.pct) label = `模型載入中… ${lp.pct}%`;
-        else if (lp.phase === 'warmup')        label = '模型載入中… 即將完成';
-        else                                   label = '伺服器啟動中…';
-      } catch {}
+      if (lp.phase === 'loading' && lp.pct) label = `模型載入中… ${lp.pct}%`;
+      else if (lp.phase === 'warmup')        label = '模型載入中… 即將完成';
+      else if (lp.phase === 'starting')      label = '伺服器啟動中…';
       text.textContent = label;
       setTimeout(checkReady, 1500);
     }
@@ -353,6 +360,22 @@ async function checkReady() {
     document.getElementById('status-text').textContent = '無法連線';
     setTimeout(checkReady, 5000);
   }
+}
+
+// ── Crash display ──────────────────────────────────────────────────────────
+function showCrash(errText) {
+  const ph = document.getElementById('preview-placeholder');
+  const hint = errText.toLowerCase().includes('vulkan') || errText.toLowerCase().includes('device')
+    ? '看起來是 GPU / Vulkan 問題：這台機器可能沒有支援 Vulkan 的顯卡或缺少顯卡驅動。'
+    : '請把下方錯誤訊息回報給開發者。';
+  ph.style.display = 'flex';
+  document.getElementById('preview-img').style.display = 'none';
+  ph.innerHTML = `
+    <div style="max-width:560px;text-align:left;color:#e05050">
+      <div style="font-size:15px;font-weight:600;margin-bottom:10px">⚠️ sd-server 啟動失敗</div>
+      <div style="font-size:12px;color:#aaa;margin-bottom:12px;line-height:1.6">${hint}</div>
+      <pre style="font-size:11px;color:#888;background:#16161f;border:1px solid #2e2e40;border-radius:8px;padding:12px;overflow:auto;max-height:280px;white-space:pre-wrap">${(errText||'(no log)').replace(/</g,'&lt;')}</pre>
+    </div>`;
 }
 
 // ── Generate ───────────────────────────────────────────────────────────────

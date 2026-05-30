@@ -94,6 +94,7 @@ PENDING, RUNNING, DONE, FAILED = "pending", "running", "done", "failed"
 jobs: dict[str, dict] = {}
 job_queue: Queue = Queue()
 sd_server_proc = None
+sd_status = {"state": "starting", "error": ""}  # starting | ready | crashed
 
 # ---------------------------------------------------------------------------
 # sd-server lifecycle
@@ -135,15 +136,33 @@ def start_sd_server() -> bool:
             r = httpx.get(f"{SD_URL}/", timeout=2)
             if r.status_code == 200:
                 log.info("sd-server ready after %ds", i + 1)
+                sd_status["state"] = "ready"
                 return True
         except Exception:
             pass
         if sd_server_proc.poll() is not None:
-            log.error("sd-server exited unexpectedly")
+            tail = _log_tail(log_path)
+            sd_status["state"] = "crashed"
+            sd_status["error"] = tail
+            log.error("sd-server exited unexpectedly (exit code %s)", sd_server_proc.returncode)
+            log.error("--- sd-server log tail ---\n%s", tail)
             return False
 
+    sd_status["state"] = "crashed"
+    sd_status["error"] = "sd-server did not become ready in time"
     log.error("sd-server did not start within %ds", SD_READY_TIMEOUT)
     return False
+
+
+def _log_tail(path: Path, lines: int = 15) -> str:
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        # collapse progress-bar carriage returns
+        text = text.replace("\r", "\n")
+        rows = [r for r in text.splitlines() if r.strip()]
+        return "\n".join(rows[-lines:])
+    except Exception:
+        return ""
 
 
 def sd_alive() -> bool:
@@ -332,6 +351,8 @@ def health():
 def loadprogress():
     """Parse sd_server.log to estimate model-loading progress (tensor count)."""
     import re
+    if sd_status["state"] == "crashed":
+        return {"phase": "crashed", "pct": 0, "error": sd_status["error"]}
     log_path = LOG_DIR / "sd_server.log"
     if not log_path.exists():
         return {"phase": "starting", "pct": 0}
