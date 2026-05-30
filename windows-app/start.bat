@@ -1,27 +1,16 @@
 @echo off
 title Z-Image Generator
 
-set "PYDIR=%~dp0python"
-if exist "%PYDIR%\python.exe" (
-    set "PYTHON=%PYDIR%\python.exe"
-) else (
-    set "PYTHON=python"
-)
+:: Portable: use bundled Python, fall back to system Python
+set "PYTHON=%~dp0python\python.exe"
+if not exist "%PYTHON%" set "PYTHON=python"
 
-if not exist "%~dp0models\z_image_turbo-Q4_K.gguf" (
-    echo.
-    echo [!] Models not found. Please run download_models.bat first.
-    echo.
-    pause
-    exit /b 1
-)
+:: Bundled dependencies live in python\Lib\site-packages (embeddable) or lib\
+set "PYTHONPATH=%~dp0lib"
 
-echo [1/2] Installing dependencies...
-"%PYTHON%" -m pip install -q -r "%~dp0requirements.txt"
-
-echo [2/2] Starting server...
+echo Starting Z-Image Generator...
 echo.
-echo  Z-Image Generator is running at: http://localhost:8080
+echo  Open in browser: http://localhost:8080
 echo  Press Ctrl+C to stop.
 echo.
 start "" "http://localhost:8080"

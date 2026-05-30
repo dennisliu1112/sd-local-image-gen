@@ -1,4 +1,4 @@
-name: Build Windows MSI
+name: Build Windows Portable
 
 on:
   push:
@@ -39,18 +39,19 @@ jobs:
           ")
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "url=$URL"  >> $GITHUB_OUTPUT
-          echo "Release: $TAG  URL: $URL"
+          echo "Release: $TAG"
 
       - name: Download sd-server Vulkan binary
         shell: bash
         run: |
           curl -L "${{ steps.sd_release.outputs.url }}" -o sd_release.zip
           unzip -j sd_release.zip "*.exe" "*.dll" -d sd_bin/
+          ls sd_bin/
 
-      - name: Assemble dist folder
+      - name: Assemble portable folder
         shell: bash
         run: |
-          mkdir -p dist/static dist/models dist/output dist/logs
+          mkdir -p dist/static dist/output dist/logs
           cp windows-app/server.py         dist/
           cp windows-app/requirements.txt  dist/
           cp windows-app/static/index.html dist/static/
@@ -59,45 +60,50 @@ jobs:
           cp sd_bin/*.exe dist/ 2>/dev/null || true
           cp sd_bin/*.dll dist/ 2>/dev/null || true
           cat > dist/README.txt << 'EOF'
-          Z-Image Generator
-          1. Double-click the Start Menu / Desktop shortcut, or run start.bat
+          Z-Image Generator (Portable)
+          ============================
+          No installation needed. No admin rights needed.
+
+          1. Run start.bat  (double-click)
           2. Browser opens at http://localhost:8080
-          3. First launch: enter your model folder, or run download_models.bat
+          3. On first launch, enter your model folder path in the setup screen,
+             OR run download_models.bat to download the ~6.3 GB models.
+
+          To move/copy this app: just move the whole folder.
           EOF
 
-      - name: Bundle Python dependencies
-        shell: cmd
-        run: python -m pip install --quiet -r dist\requirements.txt --target dist\lib
-
-      - name: Install WiX v4
-        shell: cmd
-        run: |
-          dotnet tool install --global wix --version 4.0.5
-          wix extension add WixToolset.UI.wixext/4.0.5
-
-      - name: Create license.rtf
+      - name: Bundle embeddable Python + dependencies
         shell: bash
-        run: printf '{\\rtf1\\ansi MIT License. Free to use.}' > license.rtf
-
-      - name: Generate components wxs
-        shell: cmd
         run: |
-          python windows-app\gen_components.py dist dist_components.wxs
-          type dist_components.wxs
+          PY_VER=3.12.9
+          curl -L "https://www.python.org/ftp/python/${PY_VER}/python-${PY_VER}-embed-amd64.zip" -o py_embed.zip
+          mkdir -p dist/python
+          unzip -q py_embed.zip -d dist/python
 
-      - name: Build MSI
-        shell: cmd
+          # Enable site-packages so pip-installed deps are importable
+          PTH=$(ls dist/python/python*._pth)
+          printf 'python312.zip\r\n.\r\nLib\\site-packages\r\nimport site\r\n' > "$PTH"
+
+          # Bootstrap pip, then install runtime deps into the embeddable python
+          curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+          dist/python/python.exe get-pip.py --no-warn-script-location
+          dist/python/python.exe -m pip install --no-warn-script-location -r dist/requirements.txt
+
+          echo "Bundled Python contents:"
+          ls dist/python
+
+      - name: Create ZIP
+        shell: bash
         run: |
-          wix build windows-app\setup.wxs dist_components.wxs ^
-            -d LicenseRtf=license.rtf ^
-            -ext WixToolset.UI.wixext ^
-            -arch x64 ^
-            -o ZImageGen_Setup.msi
-          dir ZImageGen_Setup.msi
+          TAG="${{ steps.sd_release.outputs.tag }}"
+          cd dist
+          7z a -tzip "../ZImageGen_Portable_${TAG}.zip" . >/dev/null
+          cd ..
+          ls -lh ZImageGen_Portable_*.zip
 
-      - name: Upload MSI
+      - name: Upload portable ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ZImageGen-MSI-${{ steps.sd_release.outputs.tag }}
-          path: ZImageGen_Setup.msi
+          name: ZImageGen-Portable-${{ steps.sd_release.outputs.tag }}
+          path: ZImageGen_Portable_*.zip
           retention-days: 30
