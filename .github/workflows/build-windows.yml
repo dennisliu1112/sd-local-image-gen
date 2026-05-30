@@ -1,0 +1,112 @@
+name: Build Windows Package
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'windows-app/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest   # just packaging, no compilation needed
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest stable-diffusion.cpp release
+        id: sd_release
+        run: |
+          RELEASE=$(curl -s https://api.github.com/repos/leejet/stable-diffusion.cpp/releases/latest)
+          TAG=$(echo "$RELEASE" | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          URL=$(echo "$RELEASE" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assets = d['assets']
+          # prefer vulkan, fallback to avx2 cpu
+          for a in assets:
+            if 'win' in a['name'] and 'vulkan' in a['name'] and 'x64' in a['name']:
+              print(a['browser_download_url']); exit()
+          for a in assets:
+            if 'win' in a['name'] and 'avx2' in a['name'] and 'x64' in a['name']:
+              print(a['browser_download_url']); exit()
+          print('')
+          ")
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "url=$URL"  >> $GITHUB_OUTPUT
+          echo "Found: $TAG — $URL"
+
+      - name: Download sd-server binary
+        run: |
+          URL="${{ steps.sd_release.outputs.url }}"
+          if [ -z "$URL" ]; then echo "No suitable binary found"; exit 1; fi
+          curl -L "$URL" -o sd_release.zip
+          unzip -j sd_release.zip "*.exe" "*.dll" -d sd_bin/ || true
+          ls sd_bin/
+
+      - name: Download Windows embeddable Python
+        run: |
+          PY_VER="3.12.9"
+          curl -L "https://www.python.org/ftp/python/${PY_VER}/python-${PY_VER}-embed-amd64.zip" -o python_embed.zip
+          mkdir -p pkg/python
+          unzip -q python_embed.zip -d pkg/python
+          # Enable site-packages (pip install support)
+          echo "import site" >> pkg/python/python312._pth || true
+
+      - name: Install pip into embedded Python
+        run: |
+          curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+          pkg/python/python.exe get-pip.py --no-warn-script-location 2>/dev/null || true
+          # On ubuntu runner we can't run .exe, so just copy pip manually
+          # pip will be bootstrapped on first start.bat run by the user
+          echo "pip bootstrap will run on first launch via start.bat"
+
+      - name: Assemble package
+        run: |
+          mkdir -p pkg/models pkg/output pkg/logs pkg/static
+
+          # App files
+          cp windows-app/server.py          pkg/
+          cp windows-app/requirements.txt   pkg/
+          cp windows-app/start.bat          pkg/
+          cp windows-app/download_models.bat pkg/
+          cp windows-app/static/index.html  pkg/static/
+
+          # sd-server binary + DLLs
+          cp sd_bin/*.exe pkg/ 2>/dev/null || true
+          cp sd_bin/*.dll pkg/ 2>/dev/null || true
+
+          # README
+          cat > pkg/README.txt << 'EOF'
+          Z-Image Generator
+          =================
+
+          首次使用：
+          1. 執行 download_models.bat  (下載約 6.3 GB 模型，只需一次)
+          2. 執行 start.bat
+          3. 瀏覽器會自動開啟 http://localhost:8080
+
+          GPU 需求：
+          - NVIDIA / AMD / Intel 均可（Vulkan 後端）
+          - 無 GPU 時自動使用 CPU（速度較慢）
+
+          解析度參考（Windows，視 GPU 效能而異）：
+          - 512×512  ：約 1-5 分鐘
+          - 1024×1024 ：約 5-20 分鐘
+          EOF
+
+          ls -lh pkg/
+
+      - name: Create ZIP
+        run: |
+          cd pkg
+          zip -r ../ZImageGen_Windows_${{ steps.sd_release.outputs.tag }}.zip .
+          cd ..
+          ls -lh *.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZImageGen-Windows-${{ steps.sd_release.outputs.tag }}
+          path: ZImageGen_Windows_*.zip
+          retention-days: 30

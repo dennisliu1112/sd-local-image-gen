@@ -48,3 +48,8 @@ XiaoAi_Prompts.md
 # OS
 .DS_Store
 Thumbs.db
+windows-app/models
+windows-app/sd-server
+windows-app/output/
+windows-app/logs/
+windows-app/python/
