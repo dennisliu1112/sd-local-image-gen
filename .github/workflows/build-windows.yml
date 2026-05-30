@@ -35,9 +35,9 @@ jobs:
         shell: cmd
         run: |
           pyinstaller --noconfirm --clean ^
-            --distpath server_dist --workpath build_pyi --specpath build_pyi ^
+            --distpath server_dist --workpath build_pyi ^
             --name server --onedir --console ^
-            --add-data "windows-app/static;static" ^
+            --add-data "%CD%\windows-app\static;static" ^
             --collect-all uvicorn ^
             windows-app\server.py
           dir server_dist\server
