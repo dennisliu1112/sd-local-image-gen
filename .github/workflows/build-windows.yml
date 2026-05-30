@@ -24,41 +24,47 @@ jobs:
           RELEASE=$(curl -sH "Authorization: token $GITHUB_TOKEN" \
             https://api.github.com/repos/leejet/stable-diffusion.cpp/releases/latest)
           TAG=$(echo "$RELEASE" | python -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
-          URL=$(echo "$RELEASE" | python -c "
+          pick() {
+            echo "$RELEASE" | python -c "
           import sys,json
+          kw='$1'
           d=json.load(sys.stdin)
           for a in d['assets']:
-            n=a['name']
-            if 'win' in n and 'vulkan' in n and 'x64' in n and n.endswith('.zip'):
-              print(a['browser_download_url']); exit()
-          for a in d['assets']:
-            n=a['name']
-            if 'win' in n and 'avx2' in n and 'x64' in n and n.endswith('.zip'):
-              print(a['browser_download_url']); exit()
-          print('')
-          ")
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "url=$URL"  >> $GITHUB_OUTPUT
+            n=a['name'].lower()
+            if 'win' in n and kw in n and 'x64' in n and n.endswith('.zip'):
+              print(a['browser_download_url']); break
+          "
+          }
+          VURL=$(pick vulkan)
+          CURL=$(pick avx2)
+          echo "tag=$TAG"  >> $GITHUB_OUTPUT
+          echo "vurl=$VURL" >> $GITHUB_OUTPUT
+          echo "curl=$CURL" >> $GITHUB_OUTPUT
           echo "Release: $TAG"
+          echo "Vulkan: $VURL"
+          echo "CPU:    $CURL"
 
-      - name: Download sd-server Vulkan binary
+      - name: Download both engines (Vulkan + CPU)
         shell: bash
         run: |
-          curl -L "${{ steps.sd_release.outputs.url }}" -o sd_release.zip
-          unzip -j sd_release.zip "*.exe" "*.dll" -d sd_bin/
-          ls sd_bin/
+          curl -L "${{ steps.sd_release.outputs.vurl }}" -o vulkan.zip
+          curl -L "${{ steps.sd_release.outputs.curl }}" -o cpu.zip
+          unzip -j vulkan.zip "*.exe" "*.dll" -d engine-vulkan/
+          unzip -j cpu.zip    "*.exe" "*.dll" -d engine-cpu/
+          echo "=== engine-vulkan ==="; ls engine-vulkan/
+          echo "=== engine-cpu ==="; ls engine-cpu/
 
       - name: Assemble portable folder
         shell: bash
         run: |
-          mkdir -p dist/static dist/output dist/logs
+          mkdir -p dist/static dist/output dist/logs dist/engine-vulkan dist/engine-cpu
           cp windows-app/server.py         dist/
           cp windows-app/requirements.txt  dist/
           cp windows-app/static/index.html dist/static/
           sed 's/$/\r/' windows-app/start.bat           > dist/start.bat
           sed 's/$/\r/' windows-app/download_models.bat > dist/download_models.bat
-          cp sd_bin/*.exe dist/ 2>/dev/null || true
-          cp sd_bin/*.dll dist/ 2>/dev/null || true
+          cp engine-vulkan/* dist/engine-vulkan/ 2>/dev/null || true
+          cp engine-cpu/*    dist/engine-cpu/    2>/dev/null || true
           cat > dist/README.txt << 'EOF'
           Z-Image Generator (Portable)
           ============================

@@ -331,7 +331,8 @@ async function checkReady() {
     const text = document.getElementById('status-text');
     if (d.sd_server_ready) {
       dot.className  = 'ready';
-      text.textContent = '就緒';
+      text.textContent = d.engine === 'cpu' ? '就緒（CPU 模式，較慢）' : '就緒';
+      window.__engine = d.engine;
       document.getElementById('gen-btn').disabled = false;
     } else {
       document.getElementById('gen-btn').disabled = true;
@@ -472,9 +473,11 @@ function updateProgressText(w, h, elapsed) {
 }
 
 function estimateSecs(w, h) {
-  // t ≈ 57 × (pixels / 512²)^1.26  (measured on Apple M5)
+  // t ≈ 57 × (pixels / 512²)^1.26  (measured on Apple M5 GPU)
   const base = 57, basePx = 512 * 512;
-  return base * Math.pow((w * h) / basePx, 1.26);
+  let t = base * Math.pow((w * h) / basePx, 1.26);
+  if (window.__engine === 'cpu') t *= 6;   // CPU is roughly 6x slower
+  return t;
 }
 
 // ── Show result ────────────────────────────────────────────────────────────

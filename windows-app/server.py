@@ -36,7 +36,7 @@ from pydantic import BaseModel, Field
 # Paths
 # ---------------------------------------------------------------------------
 ROOT       = Path(__file__).parent
-EXE        = ROOT / ("sd-server.exe" if os.name == "nt" else "sd-server")
+EXE_NAME   = "sd-server.exe" if os.name == "nt" else "sd-server"
 OUTPUT_DIR = ROOT / "output"
 LOG_DIR    = ROOT / "logs"
 STATIC_DIR = ROOT / "static"
@@ -44,6 +44,20 @@ CONFIG_FILE = ROOT / "config.json"
 
 OUTPUT_DIR.mkdir(exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
+
+# Engine candidates, tried in order: GPU first, then CPU fallback.
+# Each engine lives in its own folder (own DLLs) to avoid conflicts.
+def engine_candidates():
+    out = []
+    for label, sub in (("gpu", "engine-vulkan"), ("cpu", "engine-cpu")):
+        exe = ROOT / sub / EXE_NAME
+        if exe.exists():
+            out.append((label, exe))
+    # flat layout fallback (single engine / dev on macOS)
+    flat = ROOT / EXE_NAME
+    if flat.exists():
+        out.append(("gpu", flat))
+    return out
 
 # ---------------------------------------------------------------------------
 # Config — model_dir can be set by installer or user at any time
@@ -94,7 +108,7 @@ PENDING, RUNNING, DONE, FAILED = "pending", "running", "done", "failed"
 jobs: dict[str, dict] = {}
 job_queue: Queue = Queue()
 sd_server_proc = None
-sd_status = {"state": "starting", "error": ""}  # starting | ready | crashed
+sd_status = {"state": "starting", "error": "", "engine": ""}  # starting | ready | crashed
 
 # ---------------------------------------------------------------------------
 # sd-server lifecycle
@@ -120,64 +134,83 @@ def _short_path(p: Path) -> str:
 
 
 def start_sd_server() -> bool:
+    """Try each engine (GPU first, then CPU). Auto-fall-back when an engine
+    crashes — e.g. Vulkan OOM on a low-VRAM iGPU drops to the CPU build."""
     global sd_server_proc
 
     m = model_paths()
-    missing = [str(p) for p in [EXE, m["diff"], m["vae"], m["llm"]] if not p.exists()]
+    missing = [str(p) for p in [m["diff"], m["vae"], m["llm"]] if not p.exists()]
     if missing:
         sd_status["state"] = "crashed"
         sd_status["error"] = "找不到模型檔案：\n" + "\n".join(missing)
         log.error("Missing files: %s", missing)
         return False
 
-    cmd = [
-        str(EXE),
-        "--diffusion-model", _short_path(m["diff"]),
-        "--vae",             _short_path(m["vae"]),
-        "--llm",             _short_path(m["llm"]),
-        "--vae-tiling",
-        "--listen-port", str(SD_PORT),
-        "--listen-ip",   "127.0.0.1",
-    ]
-
-    # On macOS Metal the VAE has a precision bug — run it on CPU
-    if sys.platform == "darwin":
-        cmd.append("--vae-on-cpu")
-
-    # On Windows, keep weights in RAM and stream to VRAM on demand.
-    # Essential for low-VRAM integrated GPUs (e.g. 2 GB Intel iGPU).
-    if os.name == "nt":
-        cmd.append("--offload-to-cpu")
+    engines = engine_candidates()
+    if not engines:
+        sd_status["state"] = "crashed"
+        sd_status["error"] = "找不到 sd-server 執行檔（engine-vulkan / engine-cpu）"
+        log.error("No engine executable found")
+        return False
 
     log_path = LOG_DIR / "sd_server.log"
-    log.info("Starting sd-server on port %d …", SD_PORT)
-    sd_server_proc = subprocess.Popen(
-        cmd,
-        stdout=open(log_path, "w", encoding="utf-8"),
-        stderr=subprocess.STDOUT,
-    )
+    last_tail = ""
 
-    for i in range(SD_READY_TIMEOUT):
-        time.sleep(1)
-        try:
-            r = httpx.get(f"{SD_URL}/", timeout=2)
-            if r.status_code == 200:
-                log.info("sd-server ready after %ds", i + 1)
-                sd_status["state"] = "ready"
-                return True
-        except Exception:
-            pass
-        if sd_server_proc.poll() is not None:
-            tail = _log_tail(log_path)
-            sd_status["state"] = "crashed"
-            sd_status["error"] = tail
-            log.error("sd-server exited unexpectedly (exit code %s)", sd_server_proc.returncode)
-            log.error("--- sd-server log tail ---\n%s", tail)
-            return False
+    for idx, (label, exe) in enumerate(engines):
+        is_last = idx == len(engines) - 1
+        cmd = [
+            str(exe),
+            "--diffusion-model", _short_path(m["diff"]),
+            "--vae",             _short_path(m["vae"]),
+            "--llm",             _short_path(m["llm"]),
+            "--vae-tiling",
+            "--listen-port", str(SD_PORT),
+            "--listen-ip",   "127.0.0.1",
+        ]
+        if sys.platform == "darwin":
+            cmd.append("--vae-on-cpu")          # Metal VAE precision bug
+        if label == "gpu" and os.name == "nt":
+            cmd.append("--offload-to-cpu")      # reduce VRAM on weak GPUs
+
+        log.info("Starting sd-server [%s engine] on port %d …", label, SD_PORT)
+        sd_status["state"]  = "starting"
+        sd_status["engine"] = label
+        sd_server_proc = subprocess.Popen(
+            cmd, stdout=open(log_path, "w", encoding="utf-8"), stderr=subprocess.STDOUT,
+        )
+
+        ready = exited = False
+        for i in range(SD_READY_TIMEOUT):
+            time.sleep(1)
+            try:
+                if httpx.get(f"{SD_URL}/", timeout=2).status_code == 200:
+                    ready = True
+                    break
+            except Exception:
+                pass
+            if sd_server_proc.poll() is not None:
+                exited = True
+                last_tail = _log_tail(log_path)
+                break
+
+        if ready:
+            log.info("sd-server ready [%s engine] after %ds", label, i + 1)
+            sd_status["state"] = "ready"
+            return True
+
+        if not exited:                          # timed out → kill it
+            last_tail = "sd-server did not become ready in time"
+            try: sd_server_proc.terminate()
+            except Exception: pass
+
+        log.error("sd-server [%s engine] failed.", label)
+        if not is_last:
+            log.warning("Falling back to next engine (likely out of VRAM)…")
+        # loop continues to the next engine
 
     sd_status["state"] = "crashed"
-    sd_status["error"] = "sd-server did not become ready in time"
-    log.error("sd-server did not start within %ds", SD_READY_TIMEOUT)
+    sd_status["error"] = last_tail
+    log.error("All engines failed.\n%s", last_tail)
     return False
 
 
@@ -368,6 +401,7 @@ def health():
         "sd_server_ready": sd_alive(),
         "models_ready": models_ready(),
         "model_dir": str(m["dir"]),
+        "engine": sd_status.get("engine", ""),
         "queue_depth": job_queue.qsize(),
         "running_jobs": sum(1 for j in jobs.values() if j["status"] == RUNNING),
         "total_jobs": len(jobs),
