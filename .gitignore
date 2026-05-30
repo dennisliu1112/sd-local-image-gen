@@ -6,6 +6,8 @@ models/
 
 # Compiled binaries & CUDA DLLs
 src/build/
+# stable-diffusion.cpp source (clone separately, see README)
+src/stable-diffusion.cpp/
 bin/
 *.exe
 *.dll

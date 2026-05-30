@@ -109,7 +109,8 @@ def start_sd_server():
         "--diffusion-model", str(DIFF_MODEL),
         "--vae",             str(VAE_MODEL),
         "--llm",             str(LLM_MODEL),
-        "--vae-tiling", "--offload-to-cpu",
+        "--vae-tiling",
+        "--vae-on-cpu",   # Metal VAE decode precision bug workaround
         "--listen-port", str(SD_SERVER_PORT),
         "--listen-ip", "127.0.0.1",
     ]
