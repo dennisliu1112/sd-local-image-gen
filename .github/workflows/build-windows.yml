@@ -23,33 +23,29 @@ jobs:
           TAG=$(echo "$RELEASE" | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
           URL=$(echo "$RELEASE" | python3 -c "
           import sys,json
-          d = json.load(sys.stdin)
+          d=json.load(sys.stdin)
           for a in d['assets']:
-            n = a['name']
+            n=a['name']
             if 'win' in n and 'vulkan' in n and 'x64' in n and n.endswith('.zip'):
               print(a['browser_download_url']); exit()
           for a in d['assets']:
-            n = a['name']
+            n=a['name']
             if 'win' in n and 'avx2' in n and 'x64' in n and n.endswith('.zip'):
               print(a['browser_download_url']); exit()
-          print('')
           ")
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "url=$URL"  >> $GITHUB_OUTPUT
-          echo "Found release: $TAG"
 
       - name: Download sd-server Vulkan binary
         shell: bash
         run: |
           curl -L "${{ steps.sd_release.outputs.url }}" -o sd_release.zip
           unzip -j sd_release.zip "*.exe" "*.dll" -d sd_bin/
-          ls sd_bin/
 
       - name: Assemble dist folder
         shell: bash
         run: |
           mkdir -p dist/static dist/models dist/output dist/logs
-
           cp windows-app/server.py         dist/
           cp windows-app/requirements.txt  dist/
           cp windows-app/static/index.html dist/static/
@@ -57,65 +53,34 @@ jobs:
           sed 's/$/\r/' windows-app/download_models.bat > dist/download_models.bat
           cp sd_bin/*.exe dist/ 2>/dev/null || true
           cp sd_bin/*.dll dist/ 2>/dev/null || true
-
           cat > dist/README.txt << 'EOF'
           Z-Image Generator
-          =================
-          1. Run start.bat (or use the Start Menu / Desktop shortcut)
+          1. Double-click the Start Menu / Desktop shortcut, or run start.bat
           2. Browser opens at http://localhost:8080
-          3. On first launch: enter your model folder path
-             (or run download_models.bat to download ~6.3 GB models)
+          3. First launch: enter your model folder, or run download_models.bat
           EOF
 
       - name: Bundle Python dependencies
         shell: cmd
-        run: |
-          python -m pip install --quiet -r dist\requirements.txt --target dist\lib
-          echo Bundled.
+        run: python -m pip install --quiet -r dist\requirements.txt --target dist\lib
 
-      - name: Install WiX Toolset v3
+      - name: Install WiX v4
         shell: cmd
-        run: choco install wixtoolset --version 3.14.1 -y --no-progress
+        run: |
+          dotnet tool install --global wix
+          wix extension add WixToolset.UI.wixext/4.*
 
-      - name: Create minimal license.rtf
+      - name: Create license.rtf
         shell: bash
-        run: |
-          printf '{\\rtf1\\ansi MIT License. Free to use.}' > windows-app/license.rtf
+        run: printf '{\\rtf1\\ansi MIT License. Free to use.}' > windows-app/license.rtf
 
-      - name: Harvest dist directory with heat.exe
+      - name: Build MSI
         shell: cmd
         run: |
-          set PATH=%PATH%;C:\Program Files (x86)\WiX Toolset v3.14\bin
-          heat.exe dir dist ^
-            -cg DistComponents ^
-            -dr INSTALLFOLDER ^
-            -gg -g1 -srd -sfrag ^
-            -var var.DistDir ^
-            -out dist_components.wxs
-          type dist_components.wxs
-
-      - name: Compile with candle.exe
-        shell: cmd
-        run: |
-          set PATH=%PATH%;C:\Program Files (x86)\WiX Toolset v3.14\bin
-          candle.exe ^
+          wix build windows-app\setup.wxs ^
             -dDistDir=dist ^
+            -ext WixToolset.UI.wixext ^
             -arch x64 ^
-            -ext WixUIExtension ^
-            windows-app\setup.wxs ^
-            dist_components.wxs
-          dir *.wixobj
-
-      - name: Link with light.exe → .msi
-        shell: cmd
-        run: |
-          set PATH=%PATH%;C:\Program Files (x86)\WiX Toolset v3.14\bin
-          light.exe ^
-            -ext WixUIExtension ^
-            -b dist ^
-            -dDistDir=dist ^
-            windows-app\license.rtf ^
-            setup.wixobj dist_components.wixobj ^
             -o ZImageGen_Setup.msi
           dir ZImageGen_Setup.msi
 
