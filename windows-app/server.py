@@ -99,20 +99,42 @@ sd_status = {"state": "starting", "error": ""}  # starting | ready | crashed
 # ---------------------------------------------------------------------------
 # sd-server lifecycle
 # ---------------------------------------------------------------------------
+def _short_path(p: Path) -> str:
+    """On Windows, return the 8.3 short path (pure ASCII) so sd-server's
+    narrow-char file API can open files under non-ASCII paths (e.g. 桌面).
+    Requires the file to exist; falls back to the long path otherwise."""
+    sp = str(p)
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            _GSPN = ctypes.windll.kernel32.GetShortPathNameW
+            _GSPN.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+            _GSPN.restype = wintypes.DWORD
+            buf = ctypes.create_unicode_buffer(32768)
+            if _GSPN(sp, buf, len(buf)):
+                return buf.value
+        except Exception:
+            pass
+    return sp
+
+
 def start_sd_server() -> bool:
     global sd_server_proc
 
     m = model_paths()
     missing = [str(p) for p in [EXE, m["diff"], m["vae"], m["llm"]] if not p.exists()]
     if missing:
+        sd_status["state"] = "crashed"
+        sd_status["error"] = "找不到模型檔案：\n" + "\n".join(missing)
         log.error("Missing files: %s", missing)
         return False
 
     cmd = [
         str(EXE),
-        "--diffusion-model", str(m["diff"]),
-        "--vae",             str(m["vae"]),
-        "--llm",             str(m["llm"]),
+        "--diffusion-model", _short_path(m["diff"]),
+        "--vae",             _short_path(m["vae"]),
+        "--llm",             _short_path(m["llm"]),
         "--vae-tiling",
         "--listen-port", str(SD_PORT),
         "--listen-ip",   "127.0.0.1",
@@ -121,6 +143,11 @@ def start_sd_server() -> bool:
     # On macOS Metal the VAE has a precision bug — run it on CPU
     if sys.platform == "darwin":
         cmd.append("--vae-on-cpu")
+
+    # On Windows, keep weights in RAM and stream to VRAM on demand.
+    # Essential for low-VRAM integrated GPUs (e.g. 2 GB Intel iGPU).
+    if os.name == "nt":
+        cmd.append("--offload-to-cpu")
 
     log_path = LOG_DIR / "sd_server.log"
     log.info("Starting sd-server on port %d …", SD_PORT)

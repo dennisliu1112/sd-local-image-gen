@@ -64,6 +64,11 @@ jobs:
           ============================
           No installation needed. No admin rights needed.
 
+          IMPORTANT: Put this folder in an English-only path such as
+            C:\ZImageGen
+          Avoid Chinese folders, the Desktop (桌面), or OneDrive — the
+          image engine cannot open model files under non-English paths.
+
           1. Run start.bat  (double-click)
           2. Browser opens at http://localhost:8080
           3. On first launch, enter your model folder path in the setup screen,
