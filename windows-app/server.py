@@ -57,17 +57,29 @@ LOG_DIR.mkdir(exist_ok=True)
 # Engine candidates, tried in order: fastest GPU first, then CPU fallback.
 # Each engine lives in its own folder (own DLLs) to avoid conflicts.
 # device pref (config "device"): "auto" | "gpu" | "cpu".
+def engine_base_dirs():
+    """Folders to scan for engines: the app dir, plus a user-specified one."""
+    dirs = [ROOT]
+    ed = load_config().get("engine_dir")
+    if ed:
+        p = Path(ed)
+        if p not in dirs:
+            dirs.append(p)
+    return dirs
+
 def engine_candidates():
     all_e = []
-    for label, sub in (("cuda", "engine-cuda"),
-                       ("vulkan", "engine-vulkan"),
-                       ("cpu", "engine-cpu")):
-        exe = ROOT / sub / EXE_NAME
-        if exe.exists():
-            all_e.append((label, exe))
-    flat = ROOT / EXE_NAME           # flat fallback (single engine / macOS dev)
-    if flat.exists():
-        all_e.append(("gpu", flat))
+    seen = set()
+    for base in engine_base_dirs():
+        for label, sub in (("cuda", "engine-cuda"),
+                           ("vulkan", "engine-vulkan"),
+                           ("cpu", "engine-cpu")):
+            exe = base / sub / EXE_NAME
+            if exe.exists() and label not in seen:
+                all_e.append((label, exe)); seen.add(label)
+        flat = base / EXE_NAME       # flat fallback (single engine / macOS dev)
+        if flat.exists() and "gpu" not in seen:
+            all_e.append(("gpu", flat)); seen.add("gpu")
 
     dev = load_config().get("device", "auto")
     if dev == "cpu":
@@ -487,6 +499,10 @@ engine_dl = {"active": False, "pct": 0, "label": "", "done": False, "error": ""}
 def _engines_present() -> bool:
     return len(engine_candidates()) > 0
 
+def installed_engines() -> list:
+    """Which engine groups are currently available (by label)."""
+    return [label for label, _ in engine_candidates()]
+
 def _download_engines(labels):
     import urllib.request, zipfile
     engine_dl.update(active=True, done=False, error="", pct=0, label="")
@@ -514,11 +530,9 @@ def _download_engines(labels):
 
 
 def _boot():
-    # On Windows, engines aren't bundled — download them on first run.
-    if os.name == "nt" and not _engines_present():
-        log.info("No engine found — downloading (first run).")
-        sd_status["state"] = "downloading_engine"
-        _download_engines(["cuda", "vulkan", "cpu"])
+    # No auto-download — the app opens immediately and the user chooses what
+    # to fetch (or points at an existing folder) from the first-run screen.
+    # If engines + models are already present, this brings sd-server up.
     start_sd_server()
 
 
@@ -670,6 +684,7 @@ class ConfigRequest(BaseModel):
     model_dir: Optional[str] = None
     output_dir: Optional[str] = None
     model_urls: Optional[dict] = None
+    engine_dir: Optional[str] = None
 
 @app.get("/config")
 def get_config_endpoint():
@@ -684,6 +699,9 @@ def get_config_endpoint():
         "low_vram": bool(cfg.get("low_vram", False)),
         "models_ready": models_ready(),
         "missing": [f for f, p in files.items() if not p.exists()],
+        "engine_dir": cfg.get("engine_dir", ""),
+        "engines_ready": _engines_present(),
+        "engines_installed": installed_engines(),   # subset of cuda/vulkan/cpu/gpu
         "models": [{"name": f, "exists": p.exists(), "url": urls.get(f, ""),
                     "role": MODEL_META.get(f, {}).get("role", ""),
                     "license": MODEL_META.get(f, {}).get("license", ""),
@@ -700,7 +718,12 @@ def set_config_endpoint(req: ConfigRequest):
         cfg["output_dir"] = str(Path(req.output_dir))
     if req.model_urls is not None:
         cfg["model_urls"] = {k: v for k, v in req.model_urls.items() if k in MODEL_FILES}
+    if req.engine_dir is not None:
+        cfg["engine_dir"] = str(Path(req.engine_dir)) if req.engine_dir else ""
     save_config(cfg)
+    # Pointing at an existing engine folder may make an engine available now.
+    if req.engine_dir is not None and _engines_present() and not sd_alive():
+        threading.Thread(target=start_sd_server, daemon=True).start()
     ready = models_ready()
     # Models just became available → bring the engine up.
     if ready and sd_status.get("state") not in ("ready", "starting"):
@@ -733,6 +756,31 @@ def set_engine(req: EngineRequest):
     save_config(cfg)
     threading.Thread(target=restart_engine, daemon=True).start()
     return {"device": cfg.get("device", "auto"), "low_vram": bool(cfg.get("low_vram", False)), "restarting": True}
+
+
+class EngineDLRequest(BaseModel):
+    which: Optional[list] = None     # subset of ["vulkan","cpu","cuda"]; default = recommended
+
+def _download_engines_then_start(labels):
+    _download_engines(labels)
+    if not engine_dl.get("error"):
+        start_sd_server()
+
+@app.post("/download_engine")
+def download_engine(req: EngineDLRequest):
+    if os.name != "nt":
+        return {"active": False, "error": "引擎下載僅支援 Windows；其他平台請手動放入引擎。"}
+    if engine_dl.get("active"):
+        return {"active": True, "label": engine_dl.get("label", "")}
+    labels = [l for l in (req.which or ["vulkan", "cpu"]) if l in ENGINE_ZIPS]
+    if not labels:
+        labels = ["vulkan", "cpu"]
+    threading.Thread(target=_download_engines_then_start, args=(labels,), daemon=True).start()
+    return {"active": True, "which": labels}
+
+@app.get("/engine_status")
+def engine_status():
+    return {**engine_dl, "installed": installed_engines()}
 
 
 @app.get("/logs")

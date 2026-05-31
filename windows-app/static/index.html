@@ -101,20 +101,43 @@
   .setupbox .pri{width:100%;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px}
   .setupbox .sec{width:100%;background:transparent;color:var(--accent2);border:1px solid #3a2e60;border-radius:11px;padding:11px;font-size:13px;cursor:pointer;margin-top:10px}
   #setup-status{font-size:12px;color:var(--muted);text-align:center;margin-top:12px;min-height:16px}
+  .setupbox{max-height:92vh;overflow:auto}
+  .setupsec{border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+  .sectitle{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px}
+  .badge.ok{background:#143a28;color:#5fd39a}.badge.no{background:#3a1820;color:#ff8a8a}
+  .setupsec .pri,.setupsec .sec{margin-top:8px}
+  .setrow2{display:flex;gap:6px;margin-top:10px}.setrow2 input{flex:1}
+  .dlstatus{font-size:12px;color:var(--accent2);margin-top:10px;min-height:14px}
 </style>
 </head>
 <body>
 
 <div id="setup">
   <div class="setupbox">
-    <h2>⚙️ 模型設定</h2>
-    <p>找不到模型。輸入你存放模型的資料夾路徑，或下載模型（約 6.3 GB）。</p>
-    <input type="text" id="setup-dir" placeholder="例如 D:\AI\models">
-    <div class="hint">需包含：z_image_turbo-Q4_K.gguf、ae.safetensors、Qwen3-4B-Q4_K_M.gguf</div>
-    <div class="miss" id="setup-miss"></div>
-    <button class="pri" onclick="saveDir()">儲存並繼續</button>
-    <button class="sec" onclick="dlModels()">下載模型（約 6.3 GB）</button>
-    <div id="setup-status"></div>
+    <h2>🎉 歡迎使用 Amazing image Generator</h2>
+    <p>首次使用需準備「執行引擎」與「AI 模型」。你可以直接下載，或指定已下載好的資料夾。下載時可隨時關閉本視窗先逛逛介面，完成後即可開始生圖。</p>
+
+    <div class="setupsec">
+      <div class="sectitle">① 執行引擎 <span id="eng-state" class="badge"></span></div>
+      <button class="pri" id="eng-dl-std" onclick="dlEngine(['vulkan','cpu'])">下載通用引擎（Vulkan + CPU，約 230 MB）</button>
+      <div class="hint">適用所有顯卡與無顯卡電腦，建議先安裝這個。</div>
+      <button class="sec" id="eng-dl-cuda" onclick="dlEngine(['cuda'])">加裝 NVIDIA 加速（CUDA，約 +600 MB，僅 NVIDIA 顯卡）</button>
+      <div class="setrow2"><input type="text" id="eng-dir" placeholder="或指定引擎資料夾（內含 engine-vulkan 等）"><button class="mini" onclick="browseEng()">瀏覽…</button><button class="mini" onclick="saveEngDir()">套用</button></div>
+      <div id="eng-status" class="dlstatus"></div>
+    </div>
+
+    <div class="setupsec">
+      <div class="sectitle">② AI 模型 <span id="mdl-state" class="badge"></span></div>
+      <input type="text" id="setup-dir" placeholder="例如 D:\AI\models">
+      <div class="hint">需包含：z_image_turbo-Q4_K.gguf、ae.safetensors、Qwen3-4B-Q4_K_M.gguf</div>
+      <div class="miss" id="setup-miss"></div>
+      <button class="pri" onclick="saveDir()">使用此資料夾</button>
+      <button class="sec" onclick="dlModels()">下載模型（約 6.3 GB）</button>
+      <div id="setup-status" class="dlstatus"></div>
+    </div>
+
+    <button class="sec" onclick="closeSetup()">關閉，稍後再設定</button>
   </div>
 </div>
 
@@ -309,7 +332,11 @@ async function checkReady(){try{const d=await (await fetch(`${API}/health`)).jso
     s.textContent={cuda:'就緒 · CUDA',vulkan:'就緒 · Vulkan',gpu:'就緒 · GPU',cpu:'就緒 · CPU（較慢）'}[d.engine]||'就緒';
     document.getElementById('gen-btn').disabled=false;}
   else{document.getElementById('gen-btn').disabled=true;let lp={};try{lp=await (await fetch(`${API}/loadprogress`)).json();}catch{}
-    if(lp.phase==='crashed'){dot.className='dot err';s.textContent='引擎啟動失敗';showCrash(lp.error);return;}
+    if(lp.phase==='crashed'){
+      // Missing engine/models is a setup state, not a crash — reopen first-run.
+      try{const c=await (await fetch(`${API}/config`)).json();
+        if(!c.engines_ready||!c.models_ready){dot.className='dot busy';s.textContent='需先下載引擎與模型';paintSetup(c);document.getElementById('setup').classList.add('show');return;}}catch{}
+      dot.className='dot err';s.textContent='引擎啟動失敗';showCrash(lp.error);return;}
     dot.className='dot busy';
     s.textContent=lp.phase==='engine'?`下載引擎中 ${lp.label||''} ${lp.pct}%`:lp.phase==='loading'&&lp.pct?`模型載入中 ${lp.pct}%`:lp.phase==='warmup'?'即將完成':'啟動中…';
     setTimeout(checkReady,1500);}
@@ -384,17 +411,53 @@ async function saveOutdir(){const v=document.getElementById('outdir').value.trim
   try{await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output_dir:v})});
     const m=document.getElementById('outsaved');m.textContent='已儲存 ✓';setTimeout(()=>m.textContent='',2000);}catch(e){alert('儲存失敗：'+e.message);}}
 
-// ---- model setup ----
-async function checkModels(){try{const d=await (await fetch(`${API}/config`)).json();document.getElementById('setup-dir').value=d.model_dir||'';
-  if(!d.models_ready){if(d.missing?.length)document.getElementById('setup-miss').textContent='缺少：'+d.missing.join('、');document.getElementById('setup').classList.add('show');return false;}return true;}catch{return false;}}
-async function saveDir(){const dir=document.getElementById('setup-dir').value.trim();if(!dir)return;const st=document.getElementById('setup-status');st.textContent='儲存中…';
-  try{const d=await (await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir})})).json();
-    if(d.models_ready){document.getElementById('setup').classList.remove('show');checkReady();}else{const c=await (await fetch(`${API}/config`)).json();document.getElementById('setup-miss').textContent='缺少：'+(c.missing||[]).join('、');st.textContent='該資料夾找不到模型。';}}
-  catch(e){st.textContent='錯誤：'+e.message;}}
+// ---- first-run setup (engine + models) ----
+function setBadge(id,ok,txt){const b=document.getElementById(id);b.className='badge '+(ok?'ok':'no');b.textContent=txt;}
+function paintSetup(d){
+  const eng=!!d.engines_ready, mdl=!!d.models_ready, ins=d.engines_installed||[];
+  setBadge('eng-state',eng,eng?('已就緒'+(ins.includes('cuda')?'（含 CUDA）':'')):'尚未安裝');
+  setBadge('mdl-state',mdl,mdl?'已就緒':'缺少檔案');
+  document.getElementById('setup-dir').value=d.model_dir||'';
+  document.getElementById('eng-dir').value=d.engine_dir||'';
+  document.getElementById('setup-miss').textContent=(!mdl&&d.missing?.length)?('缺少：'+d.missing.join('、')):'';
+  const cuda=document.getElementById('eng-dl-cuda');
+  if(ins.includes('cuda')){cuda.disabled=true;cuda.textContent='✓ 已安裝 CUDA 加速';}
+  else{cuda.disabled=false;cuda.textContent='加裝 NVIDIA 加速（CUDA，約 +600 MB，僅 NVIDIA 顯卡）';}
+  const std=document.getElementById('eng-dl-std');
+  const hasStd=ins.includes('vulkan')||ins.includes('cpu')||ins.includes('gpu');
+  std.textContent=hasStd?'重新下載通用引擎（Vulkan + CPU）':'下載通用引擎（Vulkan + CPU，約 230 MB）';
+  return eng&&mdl;
+}
+async function firstRunCheck(){try{const d=await (await fetch(`${API}/config`)).json();const ready=paintSetup(d);
+  if(ready){checkReady();return true;}
+  document.getElementById('setup').classList.add('show');
+  try{const es=await (await fetch(`${API}/engine_status`)).json();if(es.active)pollEngine();}catch{}
+  return false;}catch{return false;}}
+async function refreshSetup(){try{const d=await (await fetch(`${API}/config`)).json();if(paintSetup(d)){closeSetup();}return d;}catch{}}
+function closeSetup(){document.getElementById('setup').classList.remove('show');checkReady();}
+
+let engTimer=null;
+function pollEngine(){if(engTimer)return;const st=document.getElementById('eng-status');
+  engTimer=setInterval(async()=>{try{const d=await (await fetch(`${API}/engine_status`)).json();
+    if(d.error){st.textContent='下載失敗：'+d.error;clearInterval(engTimer);engTimer=null;}
+    else if(d.active){st.textContent=`下載引擎中 ${d.label||''} … ${d.pct}%`;}
+    else{st.textContent='引擎就緒 ✓';clearInterval(engTimer);engTimer=null;refreshSetup();loadConfig();}}catch{}},1000);}
+async function dlEngine(which){const st=document.getElementById('eng-status');st.textContent='開始下載…';
+  try{const r=await (await fetch(`${API}/download_engine`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({which})})).json();
+    if(r.error){st.textContent=r.error;return;}pollEngine();}catch(e){st.textContent='錯誤：'+e.message;}}
+async function browseEng(){if(!(window.aig&&window.aig.pickFolder)){alert('此環境不支援選取，請直接輸入路徑。');return;}
+  const p=await window.aig.pickFolder();if(!p)return;document.getElementById('eng-dir').value=p;saveEngDir();}
+async function saveEngDir(){const dir=document.getElementById('eng-dir').value.trim();const st=document.getElementById('eng-status');st.textContent='套用中…';
+  try{await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({engine_dir:dir})});
+    const d=await refreshSetup();st.textContent=d&&d.engines_ready?'引擎就緒 ✓':'該資料夾找不到引擎（需含 engine-vulkan / engine-cpu）。';}catch(e){st.textContent='錯誤：'+e.message;}}
+
+async function saveDir(){const dir=document.getElementById('setup-dir').value.trim();if(!dir)return;const st=document.getElementById('setup-status');st.textContent='套用中…';
+  try{await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir})});
+    const d=await refreshSetup();st.textContent=d&&d.models_ready?'模型就緒 ✓':'該資料夾找不到完整模型。';loadConfig();}catch(e){st.textContent='錯誤：'+e.message;}}
 async function dlModels(){const dir=document.getElementById('setup-dir').value.trim();if(dir)await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir})});
   await fetch(`${API}/download_models`,{method:'POST'});const st=document.getElementById('setup-status');
   const tm=setInterval(async()=>{try{const d=await (await fetch(`${API}/download_status`)).json();
-    if(d.error){st.textContent='下載失敗：'+d.error;clearInterval(tm);}else if(d.done){st.textContent='下載完成！啟動中…';clearInterval(tm);setTimeout(()=>{document.getElementById('setup').classList.remove('show');checkReady();},1200);}else if(d.active){st.textContent=`下載中 ${d.file} … ${d.pct}%`;}}catch{}},1000);}
+    if(d.error){st.textContent='下載失敗：'+d.error;clearInterval(tm);}else if(d.done){st.textContent='模型下載完成 ✓';clearInterval(tm);refreshSetup();loadConfig();}else if(d.active){st.textContent=`下載中 ${d.file} … ${d.pct}%`;}}catch{}},1000);}
 
 // ---- settings: config (device / low-vram / model dir+urls / output) ----
 async function loadConfig(){try{const d=await (await fetch(`${API}/config`)).json();
@@ -441,7 +504,7 @@ async function applyEngine(){const device=document.getElementById('device').valu
 document.getElementById('prompt').addEventListener('input',updateFull);
 document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();generate();}});
 renderTags();loadGen();updateFull();loadConfig();
-checkModels().then(ok=>{if(ok)checkReady();});
+firstRunCheck();
 </script>
 </body>
 </html>
