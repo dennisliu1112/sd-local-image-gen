@@ -27,6 +27,9 @@
     "win": {
       "target": [{ "target": "zip", "arch": ["x64"] }],
       "icon": "build/icon.ico"
+    },
+    "mac": {
+      "icon": "build/icon.icns"
     }
   }
 }
