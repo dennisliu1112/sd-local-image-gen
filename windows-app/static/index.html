@@ -204,6 +204,7 @@
     <div class="setsec">
       <h3>生成參數</h3>
       <div class="setrow"><label>步數 Steps</label><input type="range" id="steps" min="1" max="20" value="4" oninput="stepsv.textContent=this.value"><span id="stepsv" style="width:28px;text-align:right">4</span></div>
+      <div class="setrow"><label>CFG 鮮明度</label><input type="range" id="cfg" min="1" max="4" step="0.5" value="1" oninput="cfgv.textContent=(+this.value).toFixed(1)"><span id="cfgv" style="width:28px;text-align:right">1.0</span><span style="font-size:11px;color:var(--faint)">預設 1.0；越高越鮮明、同詞變化稍多，>3 易過曝</span></div>
       <div class="setrow"><label>種子 Seed</label><input type="number" id="seed" value="-1" min="-1" style="width:200px"><button class="mini" onclick="seed.value=Math.floor(Math.random()*4294967295)">🎲 隨機</button><span style="font-size:11px;color:var(--faint)">-1 為每次隨機</span></div>
       <div class="setrow"><label>一次張數</label><input type="number" id="count" value="1" min="1" max="8" style="width:90px"><span style="font-size:11px;color:var(--faint)">一次生成幾張（依序產生）</span></div>
       <div class="setrow"><label>輸出格式</label><select id="fmt" style="width:200px"><option value="jpg" selected>JPG 99%（省空間，建議）</option><option value="png">PNG（無損，檔案大）</option></select></div>
@@ -296,7 +297,11 @@ function renderTagEdit(){
     ed.appendChild(d);});
 }
 function renderTags(){renderTagRow();renderTagEdit();}
-function saveTags(){localStorage.setItem('aig_tags',JSON.stringify(TAGS.map(t=>({label:t.label,phrase:t.phrase}))));
+// UI prefs are mirrored to the backend (config.json on disk) so they survive
+// page-origin and version changes — localStorage alone is per-origin.
+async function saveUI(patch){try{await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ui:patch})});}catch{}}
+function saveTags(){const tags=TAGS.map(t=>({label:t.label,phrase:t.phrase}));
+  localStorage.setItem('aig_tags',JSON.stringify(tags));saveUI({tags});
   const m=document.getElementById('savedmsg');m.textContent='已儲存 ✓';setTimeout(()=>m.textContent='',2000);}
 function fullPrompt(){const parts=[];
   const soul=(document.getElementById('soul')?.value||'').trim();if(soul)parts.push(soul);
@@ -310,16 +315,17 @@ async function showMeaning(){const m=document.getElementById('meaning');const q=
     m.textContent='🌐 '+(d.text||'(翻譯失敗，需連網)');}
   catch{m.textContent='(翻譯失敗，需連網)';}}
 
-// ---- gen settings (steps/seed/count/format/neg/soul) persisted ----
+// ---- gen settings (steps/cfg/seed/count/format/neg/soul) persisted ----
 function loadGen(){let s={};try{s=JSON.parse(localStorage.getItem('aig_gen'))||{};}catch{}
   if(s.steps){document.getElementById('steps').value=s.steps;document.getElementById('stepsv').textContent=s.steps;}
+  if(s.cfg){document.getElementById('cfg').value=s.cfg;document.getElementById('cfgv').textContent=(+s.cfg).toFixed(1);}
   if(s.seed!==undefined)document.getElementById('seed').value=s.seed;
   if(s.count)document.getElementById('count').value=s.count;
   if(s.format)document.getElementById('fmt').value=s.format;
   if(s.neg!==undefined)document.getElementById('neg').value=s.neg;
   if(s.soul!==undefined)document.getElementById('soul').value=s.soul;}
-function saveGen(){const s={steps:+steps.value,seed:+seed.value,count:+count.value,format:fmt.value,neg:neg.value,soul:soul.value};
-  localStorage.setItem('aig_gen',JSON.stringify(s));updateFull();
+function saveGen(){const s={steps:+steps.value,cfg:+cfg.value,seed:+seed.value,count:+count.value,format:fmt.value,neg:neg.value,soul:soul.value};
+  localStorage.setItem('aig_gen',JSON.stringify(s));saveUI({gen:s});updateFull();
   const m=document.getElementById('gensaved');if(m){m.textContent='已儲存 ✓';setTimeout(()=>m.textContent='',2000);}}
 
 // ---- resolution ----
@@ -356,12 +362,13 @@ async function generate(){const full=fullPrompt();
   const neg=document.getElementById('neg').value.trim();
   const fmt=document.getElementById('fmt').value;
   const steps=+document.getElementById('steps').value;
+  const cfg=+document.getElementById('cfg').value||1.0;
   const baseSeed=+document.getElementById('seed').value;
   const count=Math.max(1,Math.min(8,+document.getElementById('count').value||1));
   setBusy(true);pending=count;
   for(let i=0;i<count;i++){
     const seed=(baseSeed>=0)?baseSeed+i:-1;
-    const body={prompt:full,negative_prompt:neg,width:W,height:H,steps,cfg_scale:1.0,seed,format:fmt};
+    const body={prompt:full,negative_prompt:neg,width:W,height:H,steps,cfg_scale:cfg,seed,format:fmt};
     try{const r=await fetch(`${API}/generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       if(!r.ok)throw new Error((await r.json()).detail||r.statusText);
       const job=await r.json();curJob=job.job_id;addThumb(job);pollJob(job.job_id);}
@@ -470,7 +477,25 @@ async function loadConfig(){try{const d=await (await fetch(`${API}/config`)).jso
   document.getElementById('lowvram').checked=!!d.low_vram;
   document.getElementById('modeldir').value=d.model_dir||'';
   document.getElementById('outdir').value=d.output_dir||'';
+  hydrateUI(d.ui);
   renderModels(d.models||[]);}catch{}}
+
+// Pull tags + gen settings from the backend (durable store). Runs once: if the
+// backend has them, they win (and refresh localStorage); if it has none yet,
+// push whatever is in localStorage up so it becomes durable from now on.
+let uiHydrated=false;
+function hydrateUI(ui){
+  if(uiHydrated)return;uiHydrated=true;
+  if(ui&&(ui.tags?.length||ui.gen)){
+    if(ui.tags?.length){localStorage.setItem('aig_tags',JSON.stringify(ui.tags));TAGS=loadTags();renderTags();}
+    if(ui.gen){localStorage.setItem('aig_gen',JSON.stringify(ui.gen));loadGen();}
+    updateFull();
+  }else{
+    const patch={};const t=localStorage.getItem('aig_tags'),g=localStorage.getItem('aig_gen');
+    try{if(t)patch.tags=JSON.parse(t);}catch{}try{if(g)patch.gen=JSON.parse(g);}catch{}
+    if(Object.keys(patch).length)saveUI(patch);
+  }
+}
 function renderModels(models){const box=document.getElementById('modellist');box.innerHTML='';
   models.forEach(mm=>{const row=document.createElement('div');row.className='tagedit';row.style.alignItems='flex-start';
     row.innerHTML=`<div style="width:190px;flex-shrink:0">

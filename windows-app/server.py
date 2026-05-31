@@ -691,6 +691,7 @@ class ConfigRequest(BaseModel):
     output_dir: Optional[str] = None
     model_urls: Optional[dict] = None
     engine_dir: Optional[str] = None
+    ui: Optional[dict] = None          # UI prefs (tags, gen settings) — kept on disk
 
 @app.get("/config")
 def get_config_endpoint():
@@ -706,6 +707,7 @@ def get_config_endpoint():
         "models_ready": models_ready(),
         "missing": [f for f, p in files.items() if not p.exists()],
         "engine_dir": cfg.get("engine_dir", ""),
+        "ui": cfg.get("ui", {}),                     # tags + gen settings (durable)
         "engines_ready": _engines_present(),
         "engines_installed": installed_engines(),   # subset of cuda/vulkan/cpu/gpu
         "models": [{"name": f, "exists": p.exists(), "url": urls.get(f, ""),
@@ -726,6 +728,8 @@ def set_config_endpoint(req: ConfigRequest):
         cfg["model_urls"] = {k: v for k, v in req.model_urls.items() if k in MODEL_FILES}
     if req.engine_dir is not None:
         cfg["engine_dir"] = str(Path(req.engine_dir)) if req.engine_dir else ""
+    if req.ui is not None:
+        cfg["ui"] = {**cfg.get("ui", {}), **req.ui}    # merge so partial saves keep the rest
     save_config(cfg)
     # Pointing at an existing engine folder may make an engine available now.
     if req.engine_dir is not None and _engines_present() and not sd_alive():
