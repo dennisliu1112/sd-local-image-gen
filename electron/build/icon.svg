@@ -15,14 +15,26 @@
     </linearGradient>
     <clipPath id="round"><rect x="64" y="64" width="896" height="896" rx="208"/></clipPath>
     <clipPath id="boardClip"><rect x="132" y="150" width="344" height="372" rx="22"/></clipPath>
-    <g id="cloud">
-      <path d="M -86 30 C -120 30 -120 -16 -86 -18 C -90 -60 -28 -70 -6 -44
-               C 6 -74 64 -70 70 -34 C 104 -36 104 30 70 30 Z"/>
+    <clipPath id="lensClip"><circle cx="722" cy="356" r="48"/></clipPath>
+
+    <!-- three-cloud emblem: 3 petals at 120°, cloud-arc dividers -->
+    <g id="trio">
+      <g fill="#ff4d4d">
+        <path d="M 0 8 C -52 0 -96 -26 -104 -58 C -90 -96 -46 -118 -18 -104
+                 C -6 -120 6 -120 18 -104 C 46 -118 90 -96 104 -58
+                 C 96 -26 52 0 0 8 Z"/>
+      </g>
+      <g fill="#ffd23d" transform="rotate(120)">
+        <path d="M 0 8 C -52 0 -96 -26 -104 -58 C -90 -96 -46 -118 -18 -104
+                 C -6 -120 6 -120 18 -104 C 46 -118 90 -96 104 -58
+                 C 96 -26 52 0 0 8 Z"/>
+      </g>
+      <g fill="#2f6bf0" transform="rotate(240)">
+        <path d="M 0 8 C -52 0 -96 -26 -104 -58 C -90 -96 -46 -118 -18 -104
+                 C -6 -120 6 -120 18 -104 C 46 -118 90 -96 104 -58
+                 C 96 -26 52 0 0 8 Z"/>
+      </g>
     </g>
-    <!-- cloud silhouettes for computing colour overlaps (Venn) -->
-    <clipPath id="cA"><use href="#cloud" transform="translate(278 312) scale(1.0)"/></clipPath>
-    <clipPath id="cB"><use href="#cloud" transform="translate(330 310) scale(1.0)"/></clipPath>
-    <clipPath id="cC"><use href="#cloud" transform="translate(304 360) scale(1.0)"/></clipPath>
   </defs>
 
   <!-- background: left / right blue-purple split + Apple rounded corners -->
@@ -32,26 +44,14 @@
     <rect x="64"  y="64" width="896" height="896" fill="url(#sheen)"/>
   </g>
 
-  <!-- ===== LEFT: canvas board (line art), enlarged toward the frame ===== -->
+  <!-- ===== LEFT: canvas board (line art) with the three-cloud emblem ===== -->
   <rect x="122" y="140" width="364" height="392" rx="30"
         fill="none" stroke="#ffffff" stroke-width="18"/>
-  <!-- three primary-colour clouds: large, overlapping; overlaps = mixed colour -->
   <g clip-path="url(#boardClip)">
-    <!-- primaries -->
-    <use href="#cloud" fill="#ff4d4d" transform="translate(278 312) scale(1.0)"/>
-    <use href="#cloud" fill="#ffd23d" transform="translate(330 310) scale(1.0)"/>
-    <use href="#cloud" fill="#2f6bf0" transform="translate(304 360) scale(1.0)"/>
-    <!-- pairwise overlaps -->
-    <use href="#cloud" fill="#ff9a2e" transform="translate(278 312) scale(1.0)" clip-path="url(#cB)"/>  <!-- R∩Y = orange -->
-    <use href="#cloud" fill="#27c05a" transform="translate(330 310) scale(1.0)" clip-path="url(#cC)"/>  <!-- Y∩B = green -->
-    <use href="#cloud" fill="#8a3df0" transform="translate(278 312) scale(1.0)" clip-path="url(#cC)"/>  <!-- R∩B = purple -->
-    <!-- triple overlap -->
-    <g clip-path="url(#cC)">
-      <use href="#cloud" fill="#4a3a63" transform="translate(278 312) scale(1.0)" clip-path="url(#cB)"/>
-    </g>
+    <use href="#trio" transform="translate(304 338) scale(1.18)"/>
   </g>
 
-  <!-- ===== RIGHT: camera (line art), same size as the board ===== -->
+  <!-- ===== RIGHT: camera (line art); lens shows the same emblem ===== -->
   <g fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
     <path d="M690 150 h76 v46 h-76 z"/>
     <rect x="540" y="196" width="364" height="300" rx="48"/>
@@ -59,11 +59,14 @@
     <circle cx="722" cy="356" r="50"/>
     <circle cx="592" cy="252" r="12" fill="#ffffff" stroke="none"/>
   </g>
+  <g clip-path="url(#lensClip)">
+    <use href="#trio" transform="translate(722 356) scale(0.38)"/>
+  </g>
 
-  <!-- ===== bottom: A | G symmetric about the centre line, compact ===== -->
-  <g fill="#ffffff" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
-     font-size="300" font-weight="800">
-    <text x="488" y="880" text-anchor="end">A</text>
-    <text x="536" y="880" text-anchor="start">G</text>
+  <!-- ===== bottom: A i G — lowercase i centred on the divider ===== -->
+  <g fill="#ffffff" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="800">
+    <text x="476" y="880" text-anchor="end"    font-size="300">A</text>
+    <text x="512" y="880" text-anchor="middle"  font-size="190">i</text>
+    <text x="548" y="880" text-anchor="start"   font-size="300">G</text>
   </g>
 </svg>
