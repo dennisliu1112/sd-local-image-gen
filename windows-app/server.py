@@ -699,10 +699,11 @@ def get_logs():
 download_state = {"active": False, "pct": 0, "file": "", "done": False, "error": ""}
 
 MODEL_FILES = ["z_image_turbo-Q4_K.gguf", "ae.safetensors", "Qwen3-4B-Q4_K_M.gguf"]
+# Ungated, no-login direct-download mirrors (verified):
 DEFAULT_URLS = {
-    "z_image_turbo-Q4_K.gguf": "https://huggingface.co/shuttleai/shuttle-jaguar/resolve/main/z_image_turbo-Q4_K.gguf",
-    "ae.safetensors":          "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors",
-    "Qwen3-4B-Q4_K_M.gguf":    "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+    "z_image_turbo-Q4_K.gguf": "https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q4_K.gguf",
+    "ae.safetensors":          "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors",
+    "Qwen3-4B-Q4_K_M.gguf":    "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
 }
 
 MODEL_META = {
