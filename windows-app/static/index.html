@@ -82,8 +82,11 @@
   .tagdot{width:18px;height:18px;border-radius:50%;flex-shrink:0}
   .tagedit .lbl{width:120px;flex-shrink:0}
   .tagedit .phr{flex:1}
-  .save-btn{align-self:flex-start;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:11px 26px;font-size:14px;font-weight:700;cursor:pointer}
+  .save-btn{align-self:flex-start;margin-top:10px;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:11px 26px;font-size:14px;font-weight:700;cursor:pointer}
   .save-btn:hover{filter:brightness(1.08)}
+  .tip{background:rgba(124,92,252,.1);border:1px solid #3a2e60;border-radius:10px;padding:11px 14px;font-size:12px;color:var(--accent2);line-height:1.7;margin-bottom:16px}
+  .tip code{background:#231d3a;padding:1px 5px;border-radius:4px;font-size:11px}
+  .rowhint{font-size:11px;color:var(--faint);margin:-6px 0 12px 102px;line-height:1.5}
   .dlbtn{transition:.2s}
   .dlbtn.dim{background:var(--panel2);color:var(--muted);box-shadow:none}
   .dlbtn.lit{background:linear-gradient(135deg,#9b7bff,#6a3df0);box-shadow:0 0 0 0 rgba(124,92,252,.6);animation:glow 1.6s infinite}
@@ -203,9 +206,13 @@
   <div class="setwrap">
     <div class="setsec">
       <h3>生成參數</h3>
+      <div class="tip">💡 想讓「同一句話」每次都不一樣？最有效的是<b>改提示詞</b>——加上場景、光線、角度、風格、細節（例如 <code>at sunset</code>、<code>from above</code>、<code>film grain</code>）。下面的參數只能做<b>微調</b>：這是加速模型，同一句話天生會長得很像。</div>
       <div class="setrow"><label>步數 Steps</label><input type="range" id="steps" min="1" max="20" value="4" oninput="stepsv.textContent=this.value"><span id="stepsv" style="width:28px;text-align:right">4</span></div>
-      <div class="setrow"><label>CFG 鮮明度</label><input type="range" id="cfg" min="1" max="4" step="0.5" value="1" oninput="cfgv.textContent=(+this.value).toFixed(1)"><span id="cfgv" style="width:28px;text-align:right">1.0</span><span style="font-size:11px;color:var(--faint)">預設 1.0；越高越鮮明、同詞變化稍多，>3 易過曝</span></div>
-      <div class="setrow"><label>種子 Seed</label><input type="number" id="seed" value="-1" min="-1" style="width:200px"><button class="mini" onclick="seed.value=Math.floor(Math.random()*4294967295)">🎲 隨機</button><span style="font-size:11px;color:var(--faint)">-1 為每次隨機</span></div>
+      <div class="rowhint">去雜訊的步數。本模型是 4 步加速版，預設 <b>4</b> 就夠；加到 8–12 只會微幅改變細節又變慢，效果有限。</div>
+      <div class="setrow"><label>CFG 鮮明度</label><input type="range" id="cfg" min="1" max="4" step="0.5" value="1" oninput="cfgv.textContent=(+this.value).toFixed(1)"><span id="cfgv" style="width:28px;text-align:right">1.0</span></div>
+      <div class="rowhint">預設 <b>1.0</b>；越高越鮮明、同詞變化稍多。想更鮮明可試 1.5–2.5，>3 易過曝。</div>
+      <div class="setrow"><label>種子 Seed</label><input type="number" id="seed" value="-1" min="-1" style="width:200px"><button class="mini" onclick="seed.value=Math.floor(Math.random()*4294967295)">🎲 隨機</button></div>
+      <div class="rowhint">隨機種子（範圍 0～約 43 億）。<b>-1</b> = 每次隨機，所以每張其實都不同；但同一句話的構圖仍會很像（模型特性，非種子用完）。想<b>重現同一張圖</b>就填固定數字。</div>
       <div class="setrow"><label>一次張數</label><input type="number" id="count" value="1" min="1" max="8" style="width:90px"><span style="font-size:11px;color:var(--faint)">一次生成幾張（依序產生）</span></div>
       <div class="setrow"><label>輸出格式</label><select id="fmt" style="width:200px"><option value="jpg" selected>JPG 99%（省空間，建議）</option><option value="png">PNG（無損，檔案大）</option></select></div>
       <button class="save-btn" onclick="saveGen()">儲存參數</button><span class="saved" id="gensaved"></span>
