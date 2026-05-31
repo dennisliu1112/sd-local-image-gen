@@ -39,6 +39,7 @@ jobs:
             --name server --onedir --console ^
             --add-data "%CD%\windows-app\static;static" ^
             --collect-all uvicorn ^
+            --collect-all PIL ^
             windows-app\server.py
           dir server_dist\server
 

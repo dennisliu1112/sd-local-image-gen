@@ -56,19 +56,27 @@ LOG_DIR.mkdir(exist_ok=True)
 
 # Engine candidates, tried in order: fastest GPU first, then CPU fallback.
 # Each engine lives in its own folder (own DLLs) to avoid conflicts.
+# device pref (config "device"): "auto" | "gpu" | "cpu".
 def engine_candidates():
-    out = []
+    all_e = []
     for label, sub in (("cuda", "engine-cuda"),
                        ("vulkan", "engine-vulkan"),
                        ("cpu", "engine-cpu")):
         exe = ROOT / sub / EXE_NAME
         if exe.exists():
-            out.append((label, exe))
-    # flat layout fallback (single engine / dev on macOS)
-    flat = ROOT / EXE_NAME
+            all_e.append((label, exe))
+    flat = ROOT / EXE_NAME           # flat fallback (single engine / macOS dev)
     if flat.exists():
-        out.append(("gpu", flat))
-    return out
+        all_e.append(("gpu", flat))
+
+    dev = load_config().get("device", "auto")
+    if dev == "cpu":
+        filtered = [e for e in all_e if e[0] == "cpu"]
+    elif dev == "gpu":
+        filtered = [e for e in all_e if e[0] != "cpu"]
+    else:
+        filtered = all_e
+    return filtered or all_e          # never return empty
 
 # ---------------------------------------------------------------------------
 # Config — model_dir can be set by installer or user at any time
@@ -194,6 +202,9 @@ def _build_cmd(label, exe) -> list:
             cmd.append("--offload-to-cpu")  # weights stream from RAM
     if label == "cuda":
         cmd.append("--diffusion-fa")        # flash attention: smaller VRAM buffer
+    # Low-VRAM mode: push text-encoder + VAE to CPU, freeing VRAM for diffusion.
+    if label != "cpu" and load_config().get("low_vram"):
+        cmd += ["--clip-on-cpu", "--vae-on-cpu"]
     return cmd
 
 
@@ -322,7 +333,7 @@ def sd_alive() -> bool:
         return False
 
 
-def _make_filename(prompt: str, job_id: str, out_dir: Path) -> str:
+def _make_filename(prompt: str, job_id: str, out_dir: Path, ext: str = "png") -> str:
     """YYYYMMDD_HHMMSS_<prompt-slug>.png — sortable and recognisable.
     Keeps CJK/letters/digits; replaces filesystem-unsafe chars; falls back
     to a short id to avoid same-second collisions."""
@@ -330,9 +341,9 @@ def _make_filename(prompt: str, job_id: str, out_dir: Path) -> str:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     slug = re.sub(r'[\\/:*?"<>|\s]+', "-", (prompt or "").strip())[:40].strip("-")
     name = f"{ts}_{slug}" if slug else ts
-    if (out_dir / f"{name}.png").exists():
+    if (out_dir / f"{name}.{ext}").exists():
         name = f"{name}_{job_id[:6]}"
-    return f"{name}.png"
+    return f"{name}.{ext}"
 
 
 # ---------------------------------------------------------------------------
@@ -355,7 +366,10 @@ def worker():
         log.info("[%s] start: %s…", job_id[:8], job["prompt"][:60])
 
         out_dir = get_output_dir()
-        out_path = out_dir / _make_filename(job["prompt"], job_id, out_dir)
+        fmt = (job.get("format") or "png").lower()
+        if fmt not in ("png", "jpg"):
+            fmt = "png"
+        out_path = out_dir / _make_filename(job["prompt"], job_id, out_dir, fmt)
         t0 = time.monotonic()
 
         payload = {
@@ -394,7 +408,18 @@ def worker():
         elapsed = time.monotonic() - t0
         if ok and r is not None:
             img_b64 = r.json()["images"][0]
-            out_path.write_bytes(base64.b64decode(img_b64))
+            raw = base64.b64decode(img_b64)
+            if fmt == "jpg":
+                try:
+                    import io
+                    from PIL import Image
+                    Image.open(io.BytesIO(raw)).convert("RGB").save(str(out_path), "JPEG", quality=92)
+                except Exception as e:
+                    log.warning("JPG convert failed (%s), saving PNG", e)
+                    out_path = out_path.with_suffix(".png")
+                    out_path.write_bytes(raw)
+            else:
+                out_path.write_bytes(raw)
             job["status"]           = DONE
             job["output_file"]      = str(out_path)
             job["duration_seconds"] = round(elapsed, 1)
@@ -474,6 +499,7 @@ class GenerateRequest(BaseModel):
     steps:           int  = Field(4, ge=1, le=50)
     cfg_scale:       float = Field(1.0, ge=0.1, le=20.0)
     seed:            int  = Field(-1)
+    format:          str  = Field("png")
 
 
 @app.post("/generate")
@@ -496,6 +522,7 @@ def generate(req: GenerateRequest):
         "steps":      req.steps,
         "cfg_scale":  req.cfg_scale,
         "seed":       req.seed,
+        "format":     req.format,
         "created_at": datetime.now().isoformat(),
         "started_at": None,
         "finished_at": None,
@@ -592,20 +619,22 @@ def loadprogress():
 class ConfigRequest(BaseModel):
     model_dir: Optional[str] = None
     output_dir: Optional[str] = None
+    model_urls: Optional[dict] = None
 
 @app.get("/config")
 def get_config_endpoint():
     m = model_paths()
+    cfg = load_config()
+    urls = get_model_urls()
+    files = {"z_image_turbo-Q4_K.gguf": m["diff"], "ae.safetensors": m["vae"], "Qwen3-4B-Q4_K_M.gguf": m["llm"]}
     return {
         "model_dir": str(m["dir"]),
         "output_dir": str(get_output_dir()),
+        "device": cfg.get("device", "auto"),
+        "low_vram": bool(cfg.get("low_vram", False)),
         "models_ready": models_ready(),
-        "missing": [
-            f for f, p in [("z_image_turbo-Q4_K.gguf", m["diff"]),
-                           ("ae.safetensors", m["vae"]),
-                           ("Qwen3-4B-Q4_K_M.gguf", m["llm"])]
-            if not p.exists()
-        ],
+        "missing": [f for f, p in files.items() if not p.exists()],
+        "models": [{"name": f, "exists": p.exists(), "url": urls.get(f, "")} for f, p in files.items()],
     }
 
 @app.post("/config")
@@ -615,12 +644,41 @@ def set_config_endpoint(req: ConfigRequest):
         cfg["model_dir"] = str(Path(req.model_dir))
     if req.output_dir is not None:
         cfg["output_dir"] = str(Path(req.output_dir))
+    if req.model_urls is not None:
+        cfg["model_urls"] = {k: v for k, v in req.model_urls.items() if k in MODEL_FILES}
     save_config(cfg)
     ready = models_ready()
     # Models just became available → bring the engine up.
     if ready and sd_status.get("state") not in ("ready", "starting"):
         threading.Thread(target=start_sd_server, daemon=True).start()
     return {"model_dir": str(get_model_dir()), "output_dir": str(get_output_dir()), "models_ready": ready}
+
+
+class EngineRequest(BaseModel):
+    device: Optional[str] = None      # auto | gpu | cpu
+    low_vram: Optional[bool] = None
+
+def restart_engine():
+    global sd_server_proc
+    try:
+        if sd_server_proc:
+            sd_server_proc.terminate()
+    except Exception:
+        pass
+    time.sleep(1)
+    _kill_port(SD_PORT)
+    start_sd_server()
+
+@app.post("/set_engine")
+def set_engine(req: EngineRequest):
+    cfg = load_config()
+    if req.device in ("auto", "gpu", "cpu"):
+        cfg["device"] = req.device
+    if req.low_vram is not None:
+        cfg["low_vram"] = bool(req.low_vram)
+    save_config(cfg)
+    threading.Thread(target=restart_engine, daemon=True).start()
+    return {"device": cfg.get("device", "auto"), "low_vram": bool(cfg.get("low_vram", False)), "restarting": True}
 
 
 @app.get("/logs")
@@ -636,24 +694,32 @@ def get_logs():
 # --- Model download (replaces download_models.bat) -------------------------
 download_state = {"active": False, "pct": 0, "file": "", "done": False, "error": ""}
 
-MODELS_DL = [
-    ("z_image_turbo-Q4_K.gguf",
-     "https://huggingface.co/shuttleai/shuttle-jaguar/resolve/main/z_image_turbo-Q4_K.gguf"),
-    ("ae.safetensors",
-     "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors"),
-    ("Qwen3-4B-Q4_K_M.gguf",
-     "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"),
-]
+MODEL_FILES = ["z_image_turbo-Q4_K.gguf", "ae.safetensors", "Qwen3-4B-Q4_K_M.gguf"]
+DEFAULT_URLS = {
+    "z_image_turbo-Q4_K.gguf": "https://huggingface.co/shuttleai/shuttle-jaguar/resolve/main/z_image_turbo-Q4_K.gguf",
+    "ae.safetensors":          "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors",
+    "Qwen3-4B-Q4_K_M.gguf":    "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+}
+
+def get_model_urls() -> dict:
+    """Per-file download URLs; config overrides take precedence."""
+    urls = dict(DEFAULT_URLS)
+    urls.update(load_config().get("model_urls", {}) or {})
+    return urls
 
 
 def _download_thread(dest: Path):
     import urllib.request
+    urls = get_model_urls()
     download_state.update(active=True, done=False, error="", pct=0, file="")
     try:
         dest.mkdir(parents=True, exist_ok=True)
-        for fname, url in MODELS_DL:
+        for fname in MODEL_FILES:
+            url = urls.get(fname)
             out = dest / fname
             if out.exists() and out.stat().st_size > 0:
+                continue
+            if not url:
                 continue
             download_state["file"] = fname
             download_state["pct"]  = 0

@@ -174,11 +174,36 @@
       <h3>生成參數</h3>
       <div class="setrow"><label>步數 Steps</label><input type="range" id="steps" min="1" max="20" value="4" oninput="stepsv.textContent=this.value"><span id="stepsv" style="width:28px;text-align:right">4</span></div>
       <div class="setrow"><label>種子 Seed</label><input type="number" id="seed" value="-1" min="-1" style="width:200px"><button class="mini" onclick="seed.value=Math.floor(Math.random()*4294967295)">🎲 隨機</button><span style="font-size:11px;color:var(--faint)">-1 為每次隨機</span></div>
+      <div class="setrow"><label>一次張數</label><input type="number" id="count" value="1" min="1" max="8" style="width:90px"><span style="font-size:11px;color:var(--faint)">一次生成幾張（依序產生）</span></div>
+      <div class="setrow"><label>輸出格式</label><select id="fmt" style="width:140px"><option value="png">PNG（無損）</option><option value="jpg">JPG（省空間）</option></select></div>
+      <button class="save-btn" onclick="saveGen()">儲存參數</button><span class="saved" id="gensaved"></span>
     </div>
     <div class="setsec">
-      <h3>三原色標籤（主頁可勾選；完整提示詞 = 已選標籤詞 + 你的描述）</h3>
+      <h3>提示詞預設</h3>
+      <div class="field" style="margin-bottom:12px"><label>基底風格詞（永遠自動前綴；可留空）</label>
+        <input type="text" id="soul" style="width:100%" placeholder="例如 masterpiece, best quality, 8k"></div>
+      <div class="field"><label>預設負面詞（不想出現的內容；可留空）</label>
+        <input type="text" id="neg" style="width:100%" placeholder="例如 blurry, lowres, bad anatomy"></div>
+      <button class="save-btn" onclick="saveGen()">儲存</button>
+    </div>
+    <div class="setsec">
+      <h3>三原色標籤（主頁可勾選；完整提示詞 = 基底風格 + 已選標籤 + 你的描述）</h3>
       <div id="tagedit"></div>
       <button class="save-btn" onclick="saveTags()">儲存標籤</button><span class="saved" id="savedmsg"></span>
+    </div>
+    <div class="setsec">
+      <h3>運算裝置</h3>
+      <div class="setrow"><label>裝置</label>
+        <select id="device" style="width:200px"><option value="auto">自動（最快可用）</option><option value="gpu">強制 GPU</option><option value="cpu">強制 CPU（慢但穩）</option></select></div>
+      <div class="setrow"><label>省顯存模式</label><input type="checkbox" id="lowvram" style="width:18px;height:18px"><span style="font-size:11px;color:var(--faint)">把文字編碼器/VAE 丟 CPU，讓小顯卡能跑更大圖</span></div>
+      <button class="save-btn" onclick="applyEngine()">套用（重啟引擎）</button><span class="saved" id="engsaved"></span>
+    </div>
+    <div class="setsec">
+      <h3>模型</h3>
+      <div class="setrow"><label>模型資料夾</label><input type="text" id="modeldir" style="flex:1" placeholder="例如 D:\AiG\models"><button class="mini" onclick="saveModels()">儲存</button></div>
+      <div id="modellist" style="margin-top:10px"></div>
+      <button class="save-btn" onclick="downloadFromSettings()" style="margin-top:10px">下載缺少的模型</button><span class="saved" id="dlmsg"></span>
+      <div style="font-size:11px;color:var(--faint);margin-top:8px">同架構（Z-Image 系列）可換連結直接用；其他架構需另外調整引擎參數。</div>
     </div>
     <div class="setsec">
       <h3>生成資料夾（圖片儲存位置）</h3>
@@ -187,7 +212,7 @@
         <button class="mini" onclick="saveOutdir()">儲存</button>
         <button class="mini" onclick="openOut()">開啟</button>
       </div>
-      <div style="font-size:11px;color:var(--faint)">留空則用預設：圖片資料夾／AiG。輸入完整路徑後按「儲存」。</div>
+      <div style="font-size:11px;color:var(--faint)">留空則用預設：圖片資料夾／AiG。</div>
       <span class="saved" id="outsaved"></span>
     </div>
   </div>
@@ -226,9 +251,23 @@ function renderTags(){
 }
 function saveTags(){localStorage.setItem('aig_tags',JSON.stringify(TAGS.map(t=>({label:t.label,phrase:t.phrase}))));
   const m=document.getElementById('savedmsg');m.textContent='已儲存 ✓';setTimeout(()=>m.textContent='',2000);}
-function fullPrompt(){const parts=TAGS.filter(t=>t.active).map(t=>t.phrase.trim()).filter(Boolean);
+function fullPrompt(){const parts=[];
+  const soul=(document.getElementById('soul')?.value||'').trim();if(soul)parts.push(soul);
+  TAGS.filter(t=>t.active).map(t=>t.phrase.trim()).filter(Boolean).forEach(p=>parts.push(p));
   const page=document.getElementById('prompt').value.trim();if(page)parts.push(page);return parts.join(', ');}
 function updateFull(){document.getElementById('fullprev').textContent=fullPrompt()||'（在上方勾選標籤、輸入描述）';}
+
+// ---- gen settings (steps/seed/count/format/neg/soul) persisted ----
+function loadGen(){let s={};try{s=JSON.parse(localStorage.getItem('aig_gen'))||{};}catch{}
+  if(s.steps){document.getElementById('steps').value=s.steps;document.getElementById('stepsv').textContent=s.steps;}
+  if(s.seed!==undefined)document.getElementById('seed').value=s.seed;
+  if(s.count)document.getElementById('count').value=s.count;
+  if(s.format)document.getElementById('fmt').value=s.format;
+  if(s.neg!==undefined)document.getElementById('neg').value=s.neg;
+  if(s.soul!==undefined)document.getElementById('soul').value=s.soul;}
+function saveGen(){const s={steps:+steps.value,seed:+seed.value,count:+count.value,format:fmt.value,neg:neg.value,soul:soul.value};
+  localStorage.setItem('aig_gen',JSON.stringify(s));updateFull();
+  const m=document.getElementById('gensaved');if(m){m.textContent='已儲存 ✓';setTimeout(()=>m.textContent='',2000);}}
 
 // ---- resolution ----
 const RES=[['512','px',512,512],['768','px',768,768],['1024','px',1024,1024],['直','832×1216',832,1216],['橫','1216×832',1216,832],['直','1024×1280',1024,1280]];
@@ -249,20 +288,29 @@ async function checkReady(){try{const d=await (await fetch(`${API}/health`)).jso
 function showCrash(e){const ph=document.getElementById('ph');ph.style.display='flex';
   ph.innerHTML=`<div style="max-width:560px;color:#e05050"><div style="font-size:15px;font-weight:600;margin-bottom:10px">⚠️ 引擎啟動失敗</div><pre style="font-size:11px;color:#888;background:#16161f;border:1px solid #2a2a3a;border-radius:8px;padding:12px;white-space:pre-wrap;max-height:300px;overflow:auto">${(e||'').replace(/</g,'&lt;')}</pre></div>`;}
 
-// ---- generate ----
+// ---- generate (supports batch count) ----
+let pending=0;
 async function generate(){const full=fullPrompt();
   if(!full){document.getElementById('prompt').focus();return;}
-  const body={prompt:full,negative_prompt:'',width:W,height:H,steps:+document.getElementById('steps').value,cfg_scale:1.0,seed:+document.getElementById('seed').value};
-  setBusy(true);
-  try{const r=await fetch(`${API}/generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!r.ok)throw new Error((await r.json()).detail||r.statusText);
-    const job=await r.json();curJob=job.job_id;addThumb(job);pollJob(job.job_id);}
-  catch(e){setBusy(false);alert('生成失敗：'+e.message);}}
-function pollJob(id){pollT=setInterval(async()=>{try{const job=await (await fetch(`${API}/jobs/${id}`)).json();updateThumb(job);
-  if(job.status==='done'){clearInterval(pollT);showImage(job);setBusy(false);}
-  else if(job.status==='failed'){clearInterval(pollT);setBusy(false);alert('生成失敗：'+(job.error||'?'));}}catch{}},1500);}
+  const neg=document.getElementById('neg').value.trim();
+  const fmt=document.getElementById('fmt').value;
+  const steps=+document.getElementById('steps').value;
+  const baseSeed=+document.getElementById('seed').value;
+  const count=Math.max(1,Math.min(8,+document.getElementById('count').value||1));
+  setBusy(true);pending=count;
+  for(let i=0;i<count;i++){
+    const seed=(baseSeed>=0)?baseSeed+i:-1;
+    const body={prompt:full,negative_prompt:neg,width:W,height:H,steps,cfg_scale:1.0,seed,format:fmt};
+    try{const r=await fetch(`${API}/generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      if(!r.ok)throw new Error((await r.json()).detail||r.statusText);
+      const job=await r.json();curJob=job.job_id;addThumb(job);pollJob(job.job_id);}
+    catch(e){pending--;if(pending<=0)setBusy(false);alert('生成失敗：'+e.message);}
+  }}
+function pollJob(id){const t=setInterval(async()=>{try{const job=await (await fetch(`${API}/jobs/${id}`)).json();updateThumb(job);
+  if(job.status==='done'){clearInterval(t);showImage(job);pending--;if(pending<=0)setBusy(false);}
+  else if(job.status==='failed'){clearInterval(t);pending--;if(pending<=0)setBusy(false);alert('生成失敗：'+(job.error||'?'));}}catch{}},1500);}
 function setBusy(b){document.getElementById('gen-btn').disabled=b;const o=document.getElementById('overlay');
-  if(b){o.classList.add('show');t0=Date.now();document.getElementById('bar').style.width='0%';tickProg();}else{o.classList.remove('show');clearInterval(pollT);}}
+  if(b){o.classList.add('show');t0=Date.now();document.getElementById('bar').style.width='0%';tickProg();}else{o.classList.remove('show');}}
 function tickProg(){if(!document.getElementById('overlay').classList.contains('show'))return;
   const el=(Date.now()-t0)/1000,est=estSecs();document.getElementById('bar').style.width=Math.min(96,el/est*100)+'%';
   const f=s=>s>=60?`${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}`:`${Math.round(s)}s`;
@@ -297,7 +345,7 @@ function tab(t){document.getElementById('tab-gen').classList.toggle('active',t==
   document.getElementById('view-gen').style.display=t==='gen'?'flex':'none';
   document.getElementById('view-log').style.display=t==='log'?'block':'none';
   document.getElementById('view-set').style.display=t==='set'?'block':'none';
-  clearInterval(logT);if(t==='log'){refreshLog();logT=setInterval(refreshLog,2000);}}
+  clearInterval(logT);if(t==='log'){refreshLog();logT=setInterval(refreshLog,2000);}if(t==='set')loadConfig();}
 async function refreshLog(){try{const d=await (await fetch(`${API}/logs`)).json();
   document.getElementById('logc').innerHTML=`<div class="logh">引擎：${d.engine||'-'}　狀態：${d.state||'-'}</div><div class="logh">應用程式記錄</div>${esc(d.app)}<div class="logh">生圖引擎記錄</div>${esc(d.sd_server)}`;}catch{}}
 function esc(s){return (s||'').replace(/</g,'&lt;')}
@@ -319,10 +367,33 @@ async function dlModels(){const dir=document.getElementById('setup-dir').value.t
   const tm=setInterval(async()=>{try{const d=await (await fetch(`${API}/download_status`)).json();
     if(d.error){st.textContent='下載失敗：'+d.error;clearInterval(tm);}else if(d.done){st.textContent='下載完成！啟動中…';clearInterval(tm);setTimeout(()=>{document.getElementById('setup').classList.remove('show');checkReady();},1200);}else if(d.active){st.textContent=`下載中 ${d.file} … ${d.pct}%`;}}catch{}},1000);}
 
+// ---- settings: config (device / low-vram / model dir+urls / output) ----
+async function loadConfig(){try{const d=await (await fetch(`${API}/config`)).json();
+  document.getElementById('device').value=d.device||'auto';
+  document.getElementById('lowvram').checked=!!d.low_vram;
+  document.getElementById('modeldir').value=d.model_dir||'';
+  document.getElementById('outdir').value=d.output_dir||'';
+  renderModels(d.models||[]);}catch{}}
+function renderModels(models){const box=document.getElementById('modellist');box.innerHTML='';
+  models.forEach(mm=>{const row=document.createElement('div');row.className='tagedit';
+    row.innerHTML=`<span style="width:150px;flex-shrink:0;font-size:12px;color:${mm.exists?'#4caf80':'#e05050'}">${mm.exists?'✓':'✗'} ${mm.name}</span>
+      <input class="phr murl" data-name="${mm.name}" type="text" value="${(mm.url||'').replace(/"/g,'&quot;')}" placeholder="下載連結">`;
+    box.appendChild(row);});}
+async function saveModels(){const dir=document.getElementById('modeldir').value.trim();
+  const urls={};document.querySelectorAll('.murl').forEach(i=>{urls[i.dataset.name]=i.value.trim();});
+  try{await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir,model_urls:urls})});loadConfig();checkReady();}catch(e){alert('儲存失敗：'+e.message);}}
+async function applyEngine(){const device=document.getElementById('device').value,low_vram=document.getElementById('lowvram').checked;
+  const m=document.getElementById('engsaved');m.textContent='重啟引擎中…';
+  try{await fetch(`${API}/set_engine`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device,low_vram})});
+    setTimeout(()=>{m.textContent='已套用 ✓';checkReady();},800);setTimeout(()=>m.textContent='',3000);}catch(e){m.textContent='失敗：'+e.message;}}
+async function downloadFromSettings(){await saveModels();await fetch(`${API}/download_models`,{method:'POST'});
+  const m=document.getElementById('dlmsg');const tm=setInterval(async()=>{try{const d=await (await fetch(`${API}/download_status`)).json();
+    if(d.error){m.textContent='下載失敗：'+d.error;clearInterval(tm);}else if(d.done){m.textContent='下載完成 ✓';clearInterval(tm);loadConfig();checkReady();setTimeout(()=>m.textContent='',3000);}else if(d.active){m.textContent=`下載中 ${d.file} … ${d.pct}%`;}}catch{}},1000);}
+
 // init
 document.getElementById('prompt').addEventListener('input',updateFull);
 document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();generate();}});
-renderTags();updateFull();loadOutdir();
+renderTags();loadGen();updateFull();loadConfig();
 checkModels().then(ok=>{if(ok)checkReady();});
 </script>
 </body>
