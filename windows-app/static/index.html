@@ -203,7 +203,14 @@
       <div class="setrow"><label>模型資料夾</label><input type="text" id="modeldir" style="flex:1" placeholder="例如 D:\AiG\models"><button class="mini" onclick="saveModels()">儲存</button></div>
       <div id="modellist" style="margin-top:10px"></div>
       <button class="save-btn" onclick="downloadFromSettings()" style="margin-top:10px">下載缺少的模型</button><span class="saved" id="dlmsg"></span>
-      <div style="font-size:11px;color:var(--faint);margin-top:8px">同架構（Z-Image 系列）可換連結直接用；其他架構需另外調整引擎參數。</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.7">
+        <b style="color:var(--txt)">關於模型量化（Z-Image Turbo）</b><br>
+        目前內建 <b style="color:var(--accent2)">Q4_K</b> ── 已是 4GB 顯卡的最佳平衡（速度 / 品質 / 顯存），不需更換。<br>
+        • Q2_K（~2.6GB）：顯存不足時的後備<br>
+        • Q3_K / <b>Q4_K（建議，現用）</b>（~3.7GB）：4GB 卡最佳<br>
+        • Q5 / Q6 / Q8（4.5–6.6GB）：畫質略好，但需 6GB 以上顯存<br>
+        同架構（Z-Image 系列）可把上方連結換成其他量化直接用；跨架構（FLUX / SDXL 等）需另外調整引擎參數。
+      </div>
     </div>
     <div class="setsec">
       <h3>生成資料夾（圖片儲存位置）</h3>
