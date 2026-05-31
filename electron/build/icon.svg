@@ -1,19 +1,21 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- keep the blue-purple tone -->
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#9b7bff"/>
       <stop offset="0.55" stop-color="#7c5cfc"/>
       <stop offset="1" stop-color="#5b34e0"/>
     </linearGradient>
-    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
-      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-    <!-- deeper indigo for the art half -->
     <linearGradient id="bgArt" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#6a44e8"/>
       <stop offset="1" stop-color="#42229f"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.20"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e7e6f1"/>
     </linearGradient>
     <radialGradient id="lens" cx="0.5" cy="0.42" r="0.62">
       <stop offset="0" stop-color="#3a3550"/>
@@ -27,58 +29,53 @@
     </radialGradient>
     <clipPath id="round"><rect x="64" y="64" width="896" height="896" rx="208"/></clipPath>
     <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#1c0c52" flood-opacity="0.35"/>
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#1c0c52" flood-opacity="0.35"/>
     </filter>
   </defs>
 
-  <!-- background: two blue-purple tones split diagonally (no divider line) -->
+  <!-- background: left / right halves, two blue-purple tones (unchanged) -->
   <g clip-path="url(#round)">
-    <rect x="64" y="64" width="896" height="896" fill="url(#bg)"/>           <!-- camera half -->
-    <polygon points="1120,30 1120,1120 30,1120" fill="url(#bgArt)"/>         <!-- art half (deeper) -->
-    <rect x="64" y="64" width="896" height="896" fill="url(#sheen)"/>
+    <rect x="64"  y="64" width="448" height="896" fill="url(#bg)"/>
+    <rect x="512" y="64" width="448" height="896" fill="url(#bgArt)"/>
+    <rect x="64"  y="64" width="896" height="896" fill="url(#sheen)"/>
   </g>
 
-  <!-- ===== CAMERA SIDE: big lens, no tripod (upper-left) ===== -->
-  <g filter="url(#soft)" transform="translate(372 372)">
-    <circle r="212" fill="#f1f0fa"/>            <!-- lens barrel rim -->
-    <circle r="196" fill="#2a2540"/>
-    <circle r="176" fill="url(#lens)"/>
-    <circle r="120" fill="url(#glass)"/>         <!-- glass -->
-    <circle cx="-44" cy="-46" r="34" fill="#ffffff" opacity="0.6"/>  <!-- highlight -->
-    <circle cx="60" cy="64" r="16" fill="#aeb9ff" opacity="0.7"/>
-    <!-- shutter / aperture ticks on the rim -->
-    <g fill="#cfcde2">
-      <circle cx="0" cy="-188" r="9"/><circle cx="133" cy="-133" r="9"/>
-      <circle cx="188" cy="0" r="9"/><circle cx="-133" cy="-133" r="9"/>
+  <!-- ===== shared stand holding both (bottom) ===== -->
+  <g stroke="#c8c5de" stroke-width="26" stroke-linecap="round" fill="none">
+    <path d="M 322 650 L 268 882"/>
+    <path d="M 322 650 L 376 882"/>
+    <path d="M 702 650 L 648 882"/>
+    <path d="M 702 650 L 756 882"/>
+    <path d="M 300 798 L 724 798"/>
+  </g>
+  <!-- shelf / tray -->
+  <rect x="236" y="612" width="552" height="46" rx="23" fill="#dcdaee"/>
+  <rect x="236" y="612" width="552" height="16" rx="8" fill="#efeef8"/>
+
+  <!-- ===== LEFT: camera ===== -->
+  <g filter="url(#soft)">
+    <rect x="300" y="444" width="120" height="46" rx="14" fill="url(#body)"/>   <!-- viewfinder -->
+    <rect x="246" y="474" width="252" height="150" rx="34" fill="url(#body)"/>  <!-- body -->
+    <rect x="286" y="456" width="48" height="24" rx="11" fill="#d3d1e6"/>       <!-- shutter -->
+    <rect x="430" y="498" width="52" height="34" rx="10" fill="#cfd8ff"/>       <!-- flash -->
+    <circle cx="372" cy="556" r="80" fill="#2a2540"/>
+    <circle cx="372" cy="556" r="70" fill="url(#lens)"/>
+    <circle cx="372" cy="556" r="46" fill="url(#glass)"/>
+    <circle cx="350" cy="538" r="16" fill="#ffffff" opacity="0.6"/>
+  </g>
+
+  <!-- ===== RIGHT: portrait art board with seven-colour rainbow ===== -->
+  <g filter="url(#soft)">
+    <rect x="556" y="350" width="198" height="268" rx="24" fill="#f5f4fc"/>
+    <rect x="556" y="350" width="198" height="268" rx="24" fill="none" stroke="#d9d7ec" stroke-width="6"/>
+    <g fill="none" stroke-linecap="round" stroke-width="11">
+      <path d="M 571 580 A 84 84 0 0 1 739 580" stroke="#ff4d4d"/>
+      <path d="M 583 580 A 72 72 0 0 1 727 580" stroke="#ff9a3d"/>
+      <path d="M 595 580 A 60 60 0 0 1 715 580" stroke="#ffd23d"/>
+      <path d="M 607 580 A 48 48 0 0 1 703 580" stroke="#3ddc84"/>
+      <path d="M 619 580 A 36 36 0 0 1 691 580" stroke="#36a5f0"/>
+      <path d="M 631 580 A 24 24 0 0 1 679 580" stroke="#5b6cf0"/>
+      <path d="M 643 580 A 12 12 0 0 1 667 580" stroke="#a05cf0"/>
     </g>
   </g>
-
-  <!-- ===== ART SIDE: art board with 3-colour rainbow (lower-right), scaled to 75% ===== -->
-  <g transform="translate(680 700) scale(0.75) translate(-680 -700)">
-  <g filter="url(#soft)" transform="rotate(-6 652 652)">
-    <rect x="442" y="442" width="420" height="420" rx="48" fill="#f5f4fc"/>
-    <rect x="442" y="442" width="420" height="420" rx="48" fill="none" stroke="#d9d7ec" stroke-width="6"/>
-    <!-- seven-colour rainbow (concentric arcs) -->
-    <g fill="none" stroke-linecap="round" stroke-width="17">
-      <path d="M 502 788 A 150 150 0 0 1 802 788" stroke="#ff4d4d"/>
-      <path d="M 520 788 A 132 132 0 0 1 784 788" stroke="#ff9a3d"/>
-      <path d="M 538 788 A 114 114 0 0 1 766 788" stroke="#ffd23d"/>
-      <path d="M 556 788 A 96 96 0 0 1 748 788"   stroke="#3ddc84"/>
-      <path d="M 574 788 A 78 78 0 0 1 730 788"   stroke="#36a5f0"/>
-      <path d="M 592 788 A 60 60 0 0 1 712 788"   stroke="#5b6cf0"/>
-      <path d="M 610 788 A 42 42 0 0 1 694 788"   stroke="#a05cf0"/>
-    </g>
-  </g>
-
-  <!-- paintbrush crossing toward the board -->
-  <g filter="url(#soft)" transform="rotate(42 812 812)">
-    <rect x="752" y="792" width="244" height="44" rx="22" fill="#6a4bd6"/>
-    <rect x="752" y="792" width="74"  height="44" rx="22" fill="#8b6cff"/>
-    <rect x="714" y="787" width="46" height="54" rx="8" fill="#c9cede"/>
-    <rect x="714" y="787" width="46" height="54" rx="8" fill="none" stroke="#a7abc2" stroke-width="4"/>
-    <path d="M 714 792 L 642 814 L 714 836 Z" fill="#ff5d6c"/>
-    <path d="M 680 803 L 642 814 L 680 825 Z" fill="#d8324a"/>
-  </g>
-
-  </g><!-- /foreground scale -->
 </svg>
