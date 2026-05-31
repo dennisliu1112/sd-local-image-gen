@@ -474,10 +474,58 @@ def _watch_parent():
             os._exit(0)
 
 
+# --- Engine auto-download (Windows): not bundled, fetched on first run -----
+_SD_REL = "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-660-d2797b8"
+ENGINE_ZIPS = {
+    "vulkan": [_SD_REL + "/sd-master-d2797b8-bin-win-vulkan-x64.zip"],
+    "cpu":    [_SD_REL + "/sd-master-d2797b8-bin-win-avx2-x64.zip"],
+    "cuda":   [_SD_REL + "/sd-master-d2797b8-bin-win-cuda12-x64.zip",
+               _SD_REL + "/cudart-sd-bin-win-cu12-x64.zip"],
+}
+engine_dl = {"active": False, "pct": 0, "label": "", "done": False, "error": ""}
+
+def _engines_present() -> bool:
+    return len(engine_candidates()) > 0
+
+def _download_engines(labels):
+    import urllib.request, zipfile
+    engine_dl.update(active=True, done=False, error="", pct=0, label="")
+    try:
+        for label in labels:
+            dest = ROOT / ("engine-" + label)
+            dest.mkdir(parents=True, exist_ok=True)
+            for i, url in enumerate(ENGINE_ZIPS.get(label, [])):
+                engine_dl["label"] = label
+                def hook(c, b, t):
+                    if t > 0:
+                        engine_dl["pct"] = min(100, c * b * 100 // t)
+                tmp = str(dest / f"_dl{i}.zip")
+                urllib.request.urlretrieve(url, tmp, reporthook=hook)
+                with zipfile.ZipFile(tmp) as z:
+                    for m in z.namelist():
+                        if m.lower().endswith((".exe", ".dll")):
+                            (dest / Path(m).name).write_bytes(z.read(m))
+                os.remove(tmp)
+        engine_dl.update(active=False, done=True, pct=100, label="")
+        log.info("Engine download complete.")
+    except Exception as e:
+        engine_dl.update(active=False, error=str(e))
+        log.error("Engine download failed: %s", e)
+
+
+def _boot():
+    # On Windows, engines aren't bundled — download them on first run.
+    if os.name == "nt" and not _engines_present():
+        log.info("No engine found — downloading (first run).")
+        sd_status["state"] = "downloading_engine"
+        _download_engines(["cuda", "vulkan", "cpu"])
+    start_sd_server()
+
+
 @app.on_event("startup")
 def startup():
     threading.Thread(target=worker, daemon=True).start()
-    threading.Thread(target=start_sd_server, daemon=True).start()
+    threading.Thread(target=_boot, daemon=True).start()
     if os.environ.get("ELECTRON_PID") or getattr(sys, "frozen", False):
         threading.Thread(target=_watch_parent, daemon=True).start()
 
@@ -593,6 +641,8 @@ def health():
 def loadprogress():
     """Parse sd_server.log to estimate model-loading progress (tensor count)."""
     import re
+    if engine_dl["active"]:
+        return {"phase": "engine", "pct": engine_dl["pct"], "label": engine_dl["label"]}
     if sd_status["state"] == "crashed":
         return {"phase": "crashed", "pct": 0, "error": sd_status["error"]}
     log_path = LOG_DIR / "sd_server.log"

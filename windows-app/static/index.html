@@ -303,7 +303,9 @@ async function checkReady(){try{const d=await (await fetch(`${API}/health`)).jso
     document.getElementById('gen-btn').disabled=false;}
   else{document.getElementById('gen-btn').disabled=true;let lp={};try{lp=await (await fetch(`${API}/loadprogress`)).json();}catch{}
     if(lp.phase==='crashed'){dot.className='dot err';s.textContent='引擎啟動失敗';showCrash(lp.error);return;}
-    dot.className='dot busy';s.textContent=lp.phase==='loading'&&lp.pct?`模型載入中 ${lp.pct}%`:lp.phase==='warmup'?'即將完成':'啟動中…';setTimeout(checkReady,1500);}
+    dot.className='dot busy';
+    s.textContent=lp.phase==='engine'?`下載引擎中 ${lp.label||''} ${lp.pct}%`:lp.phase==='loading'&&lp.pct?`模型載入中 ${lp.pct}%`:lp.phase==='warmup'?'即將完成':'啟動中…';
+    setTimeout(checkReady,1500);}
   }catch{document.getElementById('dot').className='dot err';document.getElementById('status').textContent='無法連線';setTimeout(checkReady,4000);}}
 function showCrash(e){const ph=document.getElementById('ph');ph.style.display='flex';
   ph.innerHTML=`<div style="max-width:560px;color:#e05050"><div style="font-size:15px;font-weight:600;margin-bottom:10px">⚠️ 引擎啟動失敗</div><pre style="font-size:11px;color:#888;background:#16161f;border:1px solid #2a2a3a;border-radius:8px;padding:12px;white-space:pre-wrap;max-height:300px;overflow:auto">${(e||'').replace(/</g,'&lt;')}</pre></div>`;}

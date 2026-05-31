@@ -40,48 +40,8 @@ jobs:
             windows-app\server.py
           dir server_dist\server
 
-      # --- Bundle both sd-server engines next to the backend ---------------
-      - name: Get latest stable-diffusion.cpp release
-        id: sd_release
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          RELEASE=$(curl -sH "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/leejet/stable-diffusion.cpp/releases/latest)
-          TAG=$(echo "$RELEASE" | python -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
-          pick() {
-            echo "$RELEASE" | python -c "
-          import sys,json
-          kw='$1'
-          for a in json.load(sys.stdin)['assets']:
-            n=a['name'].lower()
-            if 'win' in n and kw in n and 'x64' in n and n.endswith('.zip'):
-              print(a['browser_download_url']); break
-          "
-          }
-          echo "tag=$TAG"               >> $GITHUB_OUTPUT
-          echo "vurl=$(pick vulkan)"     >> $GITHUB_OUTPUT
-          echo "curl=$(pick avx2)"       >> $GITHUB_OUTPUT
-          echo "cudaurl=$(pick cuda12)"  >> $GITHUB_OUTPUT
-          echo "cudarturl=$(pick cudart)">> $GITHUB_OUTPUT
-
-      - name: Download + place engines
-        shell: bash
-        run: |
-          S=server_dist/server
-          curl -L "${{ steps.sd_release.outputs.vurl }}"     -o vulkan.zip
-          curl -L "${{ steps.sd_release.outputs.curl }}"     -o cpu.zip
-          curl -L "${{ steps.sd_release.outputs.cudaurl }}"  -o cuda.zip
-          curl -L "${{ steps.sd_release.outputs.cudarturl }}" -o cudart.zip
-          unzip -j vulkan.zip "*.exe" "*.dll" -d "$S/engine-vulkan/"
-          unzip -j cpu.zip    "*.exe" "*.dll" -d "$S/engine-cpu/"
-          # CUDA engine = cuda12 build + CUDA runtime DLLs in the same folder
-          unzip -j cuda.zip   "*.exe" "*.dll" -d "$S/engine-cuda/"
-          unzip -j cudart.zip "*.dll"         -d "$S/engine-cuda/"
-          echo "=== cuda ==="; ls "$S/engine-cuda/"
-          echo "=== vulkan ==="; ls "$S/engine-vulkan/"
-          echo "=== cpu ==="; ls "$S/engine-cpu/"
+      # Engines are NOT bundled — the app downloads them on first run
+      # (keeps this artifact small, ~250 MB instead of ~1 GB).
 
       # --- Electron shell → electron-builder win zip -----------------------
       - name: Install Electron deps
@@ -104,6 +64,6 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: AmazingImageGenerator-Windows-${{ steps.sd_release.outputs.tag }}
+          name: AmazingImageGenerator-Windows-${{ github.run_number }}
           path: out/*.zip
           retention-days: 7
