@@ -451,6 +451,12 @@ def worker():
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Z-Image Generator", docs_url="/api/docs")
 
+# The Electron shell loads the UI from disk (file://) and calls this backend
+# over http://127.0.0.1 — a cross-origin request. Allow it (localhost only).
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(CORSMiddleware, allow_origins=["*"],
+                   allow_methods=["*"], allow_headers=["*"])
+
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

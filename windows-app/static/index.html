@@ -258,7 +258,10 @@
 </div>
 
 <script>
-const API='';
+// When the shell is opened directly from disk (Electron loads it instantly,
+// before the backend is up), talk to the backend over localhost. When the
+// backend serves this page itself, relative URLs work.
+const API = (location.protocol === 'file:') ? 'http://127.0.0.1:8080' : '';
 let curJob=null,curSeed=-1,pollT=null,logT=null,t0=0,engine='',W=512,H=512;
 let curW,curH,curPrompt,curNeg;
 
@@ -326,7 +329,9 @@ RES.forEach(([a,b,w,h],i)=>{const x=document.createElement('button');x.innerHTML
   if(i===0)x.classList.add('on');x.onclick=()=>{document.querySelectorAll('.seg button').forEach(e=>e.classList.remove('on'));x.classList.add('on');W=w;H=h;};resseg.appendChild(x);});
 
 // ---- status ----
-async function checkReady(){try{const d=await (await fetch(`${API}/health`)).json();
+let readyT=null;                          // single shared poll timer (no stacking)
+function scheduleReady(ms){clearTimeout(readyT);readyT=setTimeout(checkReady,ms);}
+async function checkReady(){clearTimeout(readyT);try{const d=await (await fetch(`${API}/health`)).json();
   const dot=document.getElementById('dot'),s=document.getElementById('status');
   if(d.sd_server_ready){engine=d.engine;dot.className='dot ready';
     s.textContent={cuda:'就緒 · CUDA',vulkan:'就緒 · Vulkan',gpu:'就緒 · GPU',cpu:'就緒 · CPU（較慢）'}[d.engine]||'就緒';
@@ -339,8 +344,8 @@ async function checkReady(){try{const d=await (await fetch(`${API}/health`)).jso
       dot.className='dot err';s.textContent='引擎啟動失敗';showCrash(lp.error);return;}
     dot.className='dot busy';
     s.textContent=lp.phase==='engine'?`下載引擎中 ${lp.label||''} ${lp.pct}%`:lp.phase==='loading'&&lp.pct?`模型載入中 ${lp.pct}%`:lp.phase==='warmup'?'即將完成':'啟動中…';
-    setTimeout(checkReady,1500);}
-  }catch{document.getElementById('dot').className='dot err';document.getElementById('status').textContent='無法連線';setTimeout(checkReady,4000);}}
+    scheduleReady(1500);}
+  }catch{document.getElementById('dot').className='dot busy';document.getElementById('status').textContent='啟動中…';scheduleReady(1200);}}
 function showCrash(e){const ph=document.getElementById('ph');ph.style.display='flex';
   ph.innerHTML=`<div style="max-width:560px;color:#e05050"><div style="font-size:15px;font-weight:600;margin-bottom:10px">⚠️ 引擎啟動失敗</div><pre style="font-size:11px;color:#888;background:#16161f;border:1px solid #2a2a3a;border-radius:8px;padding:12px;white-space:pre-wrap;max-height:300px;overflow:auto">${(e||'').replace(/</g,'&lt;')}</pre></div>`;}
 
@@ -504,7 +509,8 @@ async function applyEngine(){const device=document.getElementById('device').valu
 document.getElementById('prompt').addEventListener('input',updateFull);
 document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();generate();}});
 renderTags();loadGen();updateFull();loadConfig();
-firstRunCheck();
+checkReady();   // drives the status dot while the backend boots, then opens
+                // the welcome/setup screen as soon as it reports what's missing
 </script>
 </body>
 </html>
