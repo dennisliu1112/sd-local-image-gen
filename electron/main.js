@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
@@ -65,15 +65,25 @@ function waitForHealth(timeoutMs = 60000, interval = 400) {
   });
 }
 
+function installMenu() {
+  // Minimal menu so clipboard shortcuts (Cmd/Ctrl+C/V/X/A) work in inputs.
+  const isMac = process.platform === 'darwin';
+  const template = [
+    ...(isMac ? [{ role: 'appMenu' }] : []),
+    { role: 'editMenu' },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 async function createWindow() {
   win = new BrowserWindow({
     width: 1180, height: 820, minWidth: 900, minHeight: 640,
     backgroundColor: '#0f0f12',
     show: false,
+    autoHideMenuBar: true,           // hide menu bar on Windows; shortcuts still work
     title: 'Amazing image Generator',
     webPreferences: { contextIsolation: true },
   });
-  win.removeMenu();
 
   try {
     await waitForHealth();
@@ -93,6 +103,7 @@ function stopBackend(done) {
 }
 
 app.whenReady().then(() => {
+  installMenu();
   startBackend();
   createWindow();
 });

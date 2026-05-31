@@ -10,31 +10,16 @@
     --txt:#e9e9f1; --muted:#8b8ba0; --faint:#5a5a70;
     --accent:#7c5cfc; --accent2:#9b7bff;
     --r1:#ff4d4d; --y1:#ffd23d; --b1:#2f6bf0;
-    --radius:14px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
-    background:var(--bg); color:var(--txt); height:100dvh; display:flex; flex-direction:column; overflow:hidden;
-  }
-  ::-webkit-scrollbar{width:8px;height:8px}
-  ::-webkit-scrollbar-thumb{background:#2e2e40;border-radius:99px}
-  ::-webkit-scrollbar-track{background:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
+    background:var(--bg);color:var(--txt);height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#2e2e40;border-radius:99px}::-webkit-scrollbar-track{background:transparent}
 
-  /* ---------- Header ---------- */
-  header{
-    height:58px; flex-shrink:0; display:flex; align-items:center; gap:14px;
-    padding:0 18px; border-bottom:1px solid var(--line); background:var(--panel);
-  }
-  .logo{display:flex;align-items:center;gap:10px}
-  .logo svg{width:30px;height:30px;display:block}
-  .logo b{font-size:17px;font-weight:800;letter-spacing:.5px}
-  .logo b i{color:var(--accent2);font-style:normal}
-  .badge{
-    display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);
-    background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:5px 12px;
-  }
+  header{height:58px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .logo{display:flex;align-items:center;gap:10px}.logo svg{width:30px;height:30px}.logo b{font-size:17px;font-weight:800;letter-spacing:.5px}.logo b i{color:var(--accent2);font-style:normal}
+  .badge{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:5px 12px}
   .dot{width:8px;height:8px;border-radius:50%;background:#555;flex-shrink:0}
   .dot.ready{background:#4caf80}.dot.busy{background:#f5a623;animation:pulse 1s infinite}.dot.err{background:#e05050}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -43,89 +28,69 @@
   .tab{border:none;background:transparent;color:var(--muted);font-size:13px;padding:6px 16px;border-radius:8px;cursor:pointer}
   .tab.active{background:var(--accent);color:#fff;font-weight:600}
   .icon-btn{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:10px;padding:7px 12px;font-size:13px;cursor:pointer}
-  .icon-btn:hover{color:var(--txt);border-color:#3a3a4e}
+  .icon-btn:hover{color:var(--txt);border-color:#3a3a4e}.icon-btn.active{color:var(--txt);border-color:var(--accent)}
 
-  /* ---------- Layout ---------- */
   #view-gen{flex:1;display:flex;flex-direction:column;overflow:hidden}
   main{flex:1;display:flex;overflow:hidden}
-
-  /* Controls */
-  .controls{width:372px;flex-shrink:0;border-right:1px solid var(--line);background:var(--panel);
-    overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:18px}
+  .controls{width:372px;flex-shrink:0;border-right:1px solid var(--line);background:var(--panel);overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:18px}
   .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:7px;font-weight:600;letter-spacing:.3px}
-  textarea,input,select{font-family:inherit}
-  #prompt{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--txt);
-    font-size:14px;padding:13px 14px;resize:vertical;min-height:96px;outline:none;line-height:1.55}
+  #prompt{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--txt);font-size:14px;padding:13px 14px;resize:vertical;min-height:120px;outline:none;line-height:1.55}
   #prompt:focus{border-color:var(--accent)}
-  #negative{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--muted);
-    font-size:12px;padding:9px 12px;resize:vertical;min-height:42px;outline:none}
-  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
-  .chip{font-size:11.5px;color:var(--accent2);background:#1f1934;border:1px solid #322a52;border-radius:99px;
-    padding:5px 11px;cursor:pointer;white-space:nowrap}
-  .chip:hover{background:#271f44}
+  .tagrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .tag{font-size:12.5px;border-radius:99px;padding:6px 14px;cursor:pointer;border:1.5px solid;background:transparent;font-weight:600;transition:.12s}
+  .tag.on{color:#fff}
   .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
-  .seg button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;
-    padding:9px 4px;font-size:12px;cursor:pointer;text-align:center;line-height:1.3}
+  .seg button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;padding:9px 4px;font-size:12px;cursor:pointer;text-align:center;line-height:1.3}
   .seg button .sub{display:block;font-size:9.5px;color:var(--faint)}
   .seg button.on{border-color:var(--accent);background:#211b3a;color:var(--txt)}
-  .row{display:flex;align-items:center;gap:12px}
-  .row input[type=range]{flex:1;accent-color:var(--accent)}
-  .val{font-size:13px;color:var(--txt);min-width:30px;text-align:right}
-  #seed{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 11px;font-size:13px;outline:none}
-  .mini{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:8px;padding:8px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
-  .mini:hover{color:var(--txt)}
-  #gen-btn{margin-top:2px;width:100%;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;
-    color:#fff;background:linear-gradient(135deg,#9b7bff,#6a3df0);box-shadow:0 6px 20px rgba(108,61,240,.35);transition:.15s}
-  #gen-btn:hover:not(:disabled){filter:brightness(1.08)}
-  #gen-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  #gen-btn{margin-top:2px;width:100%;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;color:#fff;background:linear-gradient(135deg,#9b7bff,#6a3df0);box-shadow:0 6px 20px rgba(108,61,240,.35);transition:.15s}
+  #gen-btn:hover:not(:disabled){filter:brightness(1.08)}#gen-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  .full-preview{font-size:11px;color:var(--faint);line-height:1.5;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;min-height:20px;word-break:break-word}
 
-  /* Preview */
   .preview{flex:1;display:flex;align-items:center;justify-content:center;position:relative;padding:28px;overflow:hidden}
   #preview-img{max-width:100%;max-height:100%;border-radius:16px;display:none;box-shadow:0 12px 50px rgba(0,0,0,.55)}
-  .placeholder{display:flex;flex-direction:column;align-items:center;gap:14px;color:#33333f}
-  .placeholder p{font-size:14px;color:var(--faint)}
-  #overlay{position:absolute;inset:28px;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
-    background:rgba(14,14,21,.82);border-radius:16px}
+  .placeholder{display:flex;flex-direction:column;align-items:center;gap:14px;color:#33333f}.placeholder p{font-size:14px;color:var(--faint)}
+  #overlay{position:absolute;inset:28px;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(14,14,21,.82);border-radius:16px}
   #overlay.show{display:flex}
-  .barwrap{width:300px;height:5px;background:#23232f;border-radius:99px;overflow:hidden}
-  #bar{height:100%;width:0;background:linear-gradient(90deg,#9b7bff,#6a3df0);transition:width .5s}
+  .barwrap{width:300px;height:5px;background:#23232f;border-radius:99px;overflow:hidden}#bar{height:100%;width:0;background:linear-gradient(90deg,#9b7bff,#6a3df0);transition:width .5s}
   #ptext{font-size:13px;color:var(--muted)}
-  .imgbar{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:none;gap:8px;
-    background:rgba(22,22,31,.92);border:1px solid var(--line);border-radius:12px;padding:7px}
-  .imgbar.show{display:flex}
-  .imgbar button{border:none;background:transparent;color:var(--muted);font-size:12.5px;padding:7px 12px;border-radius:8px;cursor:pointer}
-  .imgbar button:hover{background:#23232f;color:var(--txt)}
+  .imgbar{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:none;gap:8px;background:rgba(22,22,31,.92);border:1px solid var(--line);border-radius:12px;padding:7px}
+  .imgbar.show{display:flex}.imgbar button{border:none;background:transparent;color:var(--muted);font-size:12.5px;padding:7px 12px;border-radius:8px;cursor:pointer}.imgbar button:hover{background:#23232f;color:var(--txt)}
   .imgmeta{position:absolute;top:24px;left:50%;transform:translateX(-50%);font-size:11.5px;color:var(--faint);background:rgba(22,22,31,.8);padding:5px 12px;border-radius:99px;display:none}
 
-  /* History strip */
-  .history{flex-shrink:0;height:128px;border-top:1px solid var(--line);background:var(--panel);
-    display:flex;align-items:center;gap:10px;padding:0 16px;overflow-x:auto}
+  .history{flex-shrink:0;height:128px;border-top:1px solid var(--line);background:var(--panel);display:flex;align-items:center;gap:10px;padding:0 16px;overflow-x:auto}
   .history .empty{color:var(--faint);font-size:12.5px}
-  .thumb{position:relative;height:92px;width:92px;border-radius:11px;overflow:hidden;flex-shrink:0;cursor:pointer;
-    border:2px solid transparent;background:var(--panel2)}
-  .thumb.active{border-color:var(--accent)}
-  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb{position:relative;height:92px;width:92px;border-radius:11px;overflow:hidden;flex-shrink:0;cursor:pointer;border:2px solid transparent;background:var(--panel2)}
+  .thumb.active{border-color:var(--accent)}.thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .thumb .st{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted)}
-  .thumb .st.busy{color:var(--y1)} .thumb .st.fail{color:var(--r1)}
-  .thumb .del{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);
-    color:#fff;border:none;font-size:11px;line-height:18px;cursor:pointer;display:none}
+  .thumb .st.busy{color:var(--y1)}.thumb .st.fail{color:var(--r1)}
+  .thumb .del{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:none;font-size:11px;line-height:18px;cursor:pointer;display:none}
   .thumb:hover .del{display:block}
 
-  /* Log view */
-  #view-log{flex:1;display:none;overflow:auto;padding:18px 22px}
-  #view-log pre{font-size:11.5px;color:#9aa3b2;white-space:pre-wrap;word-break:break-all;
-    font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5}
+  #view-log,#view-set{flex:1;display:none;overflow:auto;padding:22px}
+  #view-log pre{font-size:11.5px;color:#9aa3b2;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5}
   .logh{color:var(--accent2);font-size:12px;margin:16px 0 6px;font-weight:600}.logh:first-child{margin-top:0}
+  .setwrap{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+  .setsec h3{font-size:14px;margin-bottom:14px;color:var(--txt)}
+  .setrow{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .setrow label{font-size:13px;color:var(--muted);width:90px;flex-shrink:0}
+  .setrow input[type=range]{flex:1;accent-color:var(--accent)}
+  input[type=number],input[type=text]{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 12px;font-size:13px;outline:none;font-family:inherit}
+  input:focus{border-color:var(--accent)}
+  .mini{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer}.mini:hover{color:var(--txt)}
+  .tagedit{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .tagdot{width:18px;height:18px;border-radius:50%;flex-shrink:0}
+  .tagedit .lbl{width:120px;flex-shrink:0}
+  .tagedit .phr{flex:1}
+  .save-btn{align-self:flex-start;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:11px 26px;font-size:14px;font-weight:700;cursor:pointer}
+  .save-btn:hover{filter:brightness(1.08)}
+  .saved{font-size:12px;color:#4caf80;margin-left:12px}
 
-  /* Setup overlay */
   #setup{display:none;position:fixed;inset:0;z-index:100;background:rgba(10,10,16,.96);align-items:center;justify-content:center}
   #setup.show{display:flex}
   .setupbox{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:36px 40px;width:540px;max-width:94vw}
-  .setupbox h2{font-size:19px;margin-bottom:8px}
-  .setupbox p{font-size:13px;color:var(--muted);margin-bottom:22px;line-height:1.6}
-  .setupbox input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);font-size:13px;padding:11px 14px;outline:none}
-  .hint{font-size:11px;color:var(--faint);margin-top:6px}
-  .miss{font-size:11px;color:var(--r1);margin-top:6px}
+  .setupbox h2{font-size:19px;margin-bottom:8px}.setupbox p{font-size:13px;color:var(--muted);margin-bottom:22px;line-height:1.6}
+  .setupbox input{width:100%}.hint{font-size:11px;color:var(--faint);margin-top:6px}.miss{font-size:11px;color:var(--r1);margin-top:6px}
   .setupbox .pri{width:100%;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px}
   .setupbox .sec{width:100%;background:transparent;color:var(--accent2);border:1px solid #3a2e60;border-radius:11px;padding:11px;font-size:13px;cursor:pointer;margin-top:10px}
   #setup-status{font-size:12px;color:var(--muted);text-align:center;margin-top:12px;min-height:16px}
@@ -133,7 +98,6 @@
 </head>
 <body>
 
-<!-- Setup overlay -->
 <div id="setup">
   <div class="setupbox">
     <h2>⚙️ 模型設定</h2>
@@ -149,13 +113,11 @@
 
 <header>
   <div class="logo">
-    <svg viewBox="0 0 100 100" aria-hidden="true">
-      <g>
-        <path d="M50 50 C46 46 41 44 38 41 C35 37 41 35 50 44 C59 35 65 37 62 41 C59 44 54 46 50 50 Z" fill="#ff4d4d"/>
-        <g transform="rotate(120 50 50)"><path d="M50 50 C46 46 41 44 38 41 C35 37 41 35 50 44 C59 35 65 37 62 41 C59 44 54 46 50 50 Z" fill="#ffd23d"/></g>
-        <g transform="rotate(240 50 50)"><path d="M50 50 C46 46 41 44 38 41 C35 37 41 35 50 44 C59 35 65 37 62 41 C59 44 54 46 50 50 Z" fill="#2f6bf0"/></g>
-      </g>
-    </svg>
+    <svg viewBox="0 0 100 100"><g>
+      <path d="M50 50 C46 46 41 44 38 41 C35 37 41 35 50 44 C59 35 65 37 62 41 C59 44 54 46 50 50 Z" fill="#ff4d4d"/>
+      <g transform="rotate(120 50 50)"><path d="M50 50 C46 46 41 44 38 41 C35 37 41 35 50 44 C59 35 65 37 62 41 C59 44 54 46 50 50 Z" fill="#ffd23d"/></g>
+      <g transform="rotate(240 50 50)"><path d="M50 50 C46 46 41 44 38 41 C35 37 41 35 50 44 C59 35 65 37 62 41 C59 44 54 46 50 50 Z" fill="#2f6bf0"/></g>
+    </g></svg>
     <b>A<i>i</i>G</b>
   </div>
   <div class="badge"><span class="dot" id="dot"></span><span id="status">連線中…</span></div>
@@ -164,46 +126,31 @@
     <button class="tab active" id="tab-gen" onclick="tab('gen')">生成</button>
     <button class="tab" id="tab-log" onclick="tab('log')">記錄</button>
   </div>
+  <button class="icon-btn" id="tab-set" onclick="tab('set')">⚙ 設定</button>
   <button class="icon-btn" onclick="openOut()">📂 出圖資料夾</button>
 </header>
 
 <div id="view-gen">
   <main>
-    <!-- Controls -->
     <aside class="controls">
       <div class="field">
         <label>描述（要生成什麼）</label>
+        <div class="tagrow" id="tagrow"></div>
         <textarea id="prompt" placeholder="例如：a girl on the beach at sunset, photorealistic"></textarea>
-        <div class="chips" id="chips"></div>
       </div>
       <div class="field">
-        <label>不想要的內容（負面，可留空）</label>
-        <textarea id="negative" placeholder="blurry, bad anatomy, lowres"></textarea>
+        <label>完整提示詞預覽</label>
+        <div class="full-preview" id="fullprev">（在上方勾選標籤、輸入描述）</div>
       </div>
       <div class="field">
         <label>解析度</label>
         <div class="seg" id="resseg"></div>
       </div>
-      <div class="field">
-        <label>步數 Steps <span class="val" id="stepsv" style="float:right">4</span></label>
-        <div class="row"><input type="range" id="steps" min="1" max="20" value="4" oninput="stepsv.textContent=this.value"></div>
-      </div>
-      <div class="field">
-        <label>種子 Seed（-1 為隨機）</label>
-        <div class="row">
-          <input id="seed" type="number" value="-1" min="-1">
-          <button class="mini" onclick="seed.value=Math.floor(Math.random()*4294967295)">🎲</button>
-        </div>
-      </div>
       <button id="gen-btn" onclick="generate()" disabled>生成圖片</button>
     </aside>
-
-    <!-- Preview -->
     <section class="preview">
       <div class="placeholder" id="ph">
-        <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1">
-          <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
-        </svg>
+        <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
         <p>輸入描述後按「生成圖片」</p>
       </div>
       <div class="imgmeta" id="imgmeta"></div>
@@ -213,166 +160,169 @@
         <button onclick="reuseSeed()">🌱 沿用種子</button>
         <button onclick="regen()">↻ 重新生成</button>
       </div>
-      <div id="overlay">
-        <div class="barwrap"><div id="bar"></div></div>
-        <div id="ptext">準備中…</div>
-      </div>
+      <div id="overlay"><div class="barwrap"><div id="bar"></div></div><div id="ptext">準備中…</div></div>
     </section>
   </main>
-
-  <!-- History -->
   <div class="history" id="history"><span class="empty">尚無生成記錄</span></div>
 </div>
 
 <div id="view-log"><pre id="logc">尚無記錄。</pre></div>
 
+<div id="view-set">
+  <div class="setwrap">
+    <div class="setsec">
+      <h3>生成參數</h3>
+      <div class="setrow"><label>步數 Steps</label><input type="range" id="steps" min="1" max="20" value="4" oninput="stepsv.textContent=this.value"><span id="stepsv" style="width:28px;text-align:right">4</span></div>
+      <div class="setrow"><label>種子 Seed</label><input type="number" id="seed" value="-1" min="-1" style="width:200px"><button class="mini" onclick="seed.value=Math.floor(Math.random()*4294967295)">🎲 隨機</button><span style="font-size:11px;color:var(--faint)">-1 為每次隨機</span></div>
+    </div>
+    <div class="setsec">
+      <h3>三原色標籤（主頁可勾選；完整提示詞 = 已選標籤詞 + 你的描述）</h3>
+      <div id="tagedit"></div>
+      <button class="save-btn" onclick="saveTags()">儲存標籤</button><span class="saved" id="savedmsg"></span>
+    </div>
+    <div class="setsec">
+      <h3>生成資料夾（圖片儲存位置）</h3>
+      <div class="setrow">
+        <input type="text" id="outdir" style="flex:1" placeholder="例如 D:\AiG\output">
+        <button class="mini" onclick="saveOutdir()">儲存</button>
+        <button class="mini" onclick="openOut()">開啟</button>
+      </div>
+      <div style="font-size:11px;color:var(--faint)">留空則用預設：圖片資料夾／AiG。輸入完整路徑後按「儲存」。</div>
+      <span class="saved" id="outsaved"></span>
+    </div>
+  </div>
+</div>
+
 <script>
 const API='';
-let curJob=null, curSeed=-1, pollT=null, logT=null, t0=0, engine='', W=512, H=512;
+let curJob=null,curSeed=-1,pollT=null,logT=null,t0=0,engine='',W=512,H=512;
+let curW,curH,curPrompt,curNeg;
 
-// presets
-const PRESETS=[
-  ['寫實人像','portrait of a young woman, soft natural light, photorealistic, 85mm, sharp focus'],
-  ['風景','majestic mountain landscape at golden hour, ultra detailed, cinematic'],
-  ['動漫','anime style girl, vibrant colors, detailed illustration, studio ghibli'],
-  ['美食','gourmet food photography, top-down, soft studio light, appetizing'],
-  ['科幻','futuristic cyberpunk city at night, neon lights, rain, cinematic'],
-  ['可愛動物','a cute fluffy kitten, big eyes, soft lighting, highly detailed'],
+// ---- tags (3 primary colours, editable, persisted) ----
+const TAG_DEFAULTS=[
+  {key:'r',color:'#ff4d4d',label:'寫實',phrase:'photorealistic, ultra detailed, sharp focus, 8k'},
+  {key:'y',color:'#ffd23d',label:'溫暖',phrase:'warm golden hour lighting, vibrant colors, cinematic'},
+  {key:'b',color:'#2f6bf0',label:'夢幻',phrase:'dreamy soft light, pastel tones, ethereal, bokeh'},
 ];
-const chips=document.getElementById('chips');
-PRESETS.forEach(([n,p])=>{const b=document.createElement('button');b.className='chip';b.textContent=n;
-  b.onclick=()=>{document.getElementById('prompt').value=p;};chips.appendChild(b);});
-
-// resolution segments
-const RES=[['512²',512,512],['768²',768,768],['1024²',1024,1024],
-  ['直 832×1216',832,1216],['橫 1216×832',1216,832],['直 1024×1280',1024,1280]];
-const resseg=document.getElementById('resseg');
-RES.forEach(([lbl,w,h],i)=>{const b=document.createElement('button');
-  b.innerHTML=lbl.replace(/(\d+×\d+|\d+²)/,'<span class="sub">$1</span>').replace(/²/,'');
-  if(/²/.test(lbl)){b.innerHTML=lbl.replace('²','')+'<span class="sub">px</span>';}
-  b.dataset.w=w;b.dataset.h=h;if(i===0)b.classList.add('on');
-  b.onclick=()=>{document.querySelectorAll('.seg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');W=w;H=h;};
-  resseg.appendChild(b);});
-
-// ---------- status ----------
-async function checkReady(){
-  try{
-    const d=await (await fetch(`${API}/health`)).json();
-    const dot=document.getElementById('dot'),s=document.getElementById('status');
-    if(d.sd_server_ready){
-      engine=d.engine;dot.className='dot ready';
-      s.textContent={cuda:'就緒 · CUDA',vulkan:'就緒 · Vulkan',gpu:'就緒 · GPU',cpu:'就緒 · CPU（較慢）'}[d.engine]||'就緒';
-      document.getElementById('gen-btn').disabled=false;
-    }else{
-      document.getElementById('gen-btn').disabled=true;
-      let lp={};try{lp=await (await fetch(`${API}/loadprogress`)).json();}catch{}
-      if(lp.phase==='crashed'){dot.className='dot err';s.textContent='引擎啟動失敗';showCrash(lp.error);return;}
-      dot.className='dot busy';
-      s.textContent=lp.phase==='loading'&&lp.pct?`模型載入中 ${lp.pct}%`:lp.phase==='warmup'?'即將完成':'啟動中…';
-      setTimeout(checkReady,1500);
-    }
-  }catch{document.getElementById('dot').className='dot err';document.getElementById('status').textContent='無法連線';setTimeout(checkReady,4000);}
+let TAGS=loadTags();
+function loadTags(){try{const s=JSON.parse(localStorage.getItem('aig_tags'));
+  if(Array.isArray(s)&&s.length===3)return TAG_DEFAULTS.map((d,i)=>({...d,label:s[i].label,phrase:s[i].phrase,active:false}));}catch{}
+  return TAG_DEFAULTS.map(d=>({...d,active:false}));}
+function renderTags(){
+  const row=document.getElementById('tagrow');row.innerHTML='';
+  TAGS.forEach(t=>{const b=document.createElement('button');b.className='tag'+(t.active?' on':'');
+    b.textContent=t.label;b.style.borderColor=t.color;b.style.color=t.active?'#fff':t.color;
+    b.style.background=t.active?t.color:'transparent';
+    b.onclick=()=>{t.active=!t.active;renderTags();updateFull();};row.appendChild(b);});
+  // editors in settings
+  const ed=document.getElementById('tagedit');ed.innerHTML='';
+  TAGS.forEach(t=>{const d=document.createElement('div');d.className='tagedit';
+    d.innerHTML=`<span class="tagdot" style="background:${t.color}"></span>
+      <input class="lbl" type="text" value="${t.label.replace(/"/g,'&quot;')}" placeholder="標籤名">
+      <input class="phr" type="text" value="${t.phrase.replace(/"/g,'&quot;')}" placeholder="此標籤的提示詞">`;
+    const[lbl,phr]=d.querySelectorAll('input');
+    lbl.oninput=()=>{t.label=lbl.value;renderTags();};phr.oninput=()=>{t.phrase=phr.value;updateFull();};
+    ed.appendChild(d);});
 }
+function saveTags(){localStorage.setItem('aig_tags',JSON.stringify(TAGS.map(t=>({label:t.label,phrase:t.phrase}))));
+  const m=document.getElementById('savedmsg');m.textContent='已儲存 ✓';setTimeout(()=>m.textContent='',2000);}
+function fullPrompt(){const parts=TAGS.filter(t=>t.active).map(t=>t.phrase.trim()).filter(Boolean);
+  const page=document.getElementById('prompt').value.trim();if(page)parts.push(page);return parts.join(', ');}
+function updateFull(){document.getElementById('fullprev').textContent=fullPrompt()||'（在上方勾選標籤、輸入描述）';}
+
+// ---- resolution ----
+const RES=[['512','px',512,512],['768','px',768,768],['1024','px',1024,1024],['直','832×1216',832,1216],['橫','1216×832',1216,832],['直','1024×1280',1024,1280]];
+const resseg=document.getElementById('resseg');
+RES.forEach(([a,b,w,h],i)=>{const x=document.createElement('button');x.innerHTML=`${a}<span class="sub">${b}</span>`;
+  if(i===0)x.classList.add('on');x.onclick=()=>{document.querySelectorAll('.seg button').forEach(e=>e.classList.remove('on'));x.classList.add('on');W=w;H=h;};resseg.appendChild(x);});
+
+// ---- status ----
+async function checkReady(){try{const d=await (await fetch(`${API}/health`)).json();
+  const dot=document.getElementById('dot'),s=document.getElementById('status');
+  if(d.sd_server_ready){engine=d.engine;dot.className='dot ready';
+    s.textContent={cuda:'就緒 · CUDA',vulkan:'就緒 · Vulkan',gpu:'就緒 · GPU',cpu:'就緒 · CPU（較慢）'}[d.engine]||'就緒';
+    document.getElementById('gen-btn').disabled=false;}
+  else{document.getElementById('gen-btn').disabled=true;let lp={};try{lp=await (await fetch(`${API}/loadprogress`)).json();}catch{}
+    if(lp.phase==='crashed'){dot.className='dot err';s.textContent='引擎啟動失敗';showCrash(lp.error);return;}
+    dot.className='dot busy';s.textContent=lp.phase==='loading'&&lp.pct?`模型載入中 ${lp.pct}%`:lp.phase==='warmup'?'即將完成':'啟動中…';setTimeout(checkReady,1500);}
+  }catch{document.getElementById('dot').className='dot err';document.getElementById('status').textContent='無法連線';setTimeout(checkReady,4000);}}
 function showCrash(e){const ph=document.getElementById('ph');ph.style.display='flex';
   ph.innerHTML=`<div style="max-width:560px;color:#e05050"><div style="font-size:15px;font-weight:600;margin-bottom:10px">⚠️ 引擎啟動失敗</div><pre style="font-size:11px;color:#888;background:#16161f;border:1px solid #2a2a3a;border-radius:8px;padding:12px;white-space:pre-wrap;max-height:300px;overflow:auto">${(e||'').replace(/</g,'&lt;')}</pre></div>`;}
 
-// ---------- generate ----------
-async function generate(){
-  const prompt=document.getElementById('prompt').value.trim();
-  if(!prompt){document.getElementById('prompt').focus();return;}
-  const body={prompt,negative_prompt:document.getElementById('negative').value.trim(),
-    width:W,height:H,steps:+document.getElementById('steps').value,cfg_scale:1.0,seed:+document.getElementById('seed').value};
+// ---- generate ----
+async function generate(){const full=fullPrompt();
+  if(!full){document.getElementById('prompt').focus();return;}
+  const body={prompt:full,negative_prompt:'',width:W,height:H,steps:+document.getElementById('steps').value,cfg_scale:1.0,seed:+document.getElementById('seed').value};
   setBusy(true);
-  try{
-    const r=await fetch(`${API}/generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!r.ok){throw new Error((await r.json()).detail||r.statusText);}
-    const job=await r.json();curJob=job.job_id;addThumb(job);pollJob(job.job_id);
-  }catch(e){setBusy(false);alert('生成失敗：'+e.message);}
-}
-function pollJob(id){pollT=setInterval(async()=>{
-  try{const job=await (await fetch(`${API}/jobs/${id}`)).json();
-    updateProg(job);updateThumb(job);
-    if(job.status==='done'){clearInterval(pollT);showImage(job);setBusy(false);}
-    else if(job.status==='failed'){clearInterval(pollT);setBusy(false);alert('生成失敗：'+(job.error||'?'));}
-  }catch{}},1500);}
-
-function setBusy(b){document.getElementById('gen-btn').disabled=b;
-  const o=document.getElementById('overlay');
-  if(b){o.classList.add('show');t0=Date.now();document.getElementById('bar').style.width='0%';tickProg();}
-  else{o.classList.remove('show');clearInterval(pollT);}}
+  try{const r=await fetch(`${API}/generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok)throw new Error((await r.json()).detail||r.statusText);
+    const job=await r.json();curJob=job.job_id;addThumb(job);pollJob(job.job_id);}
+  catch(e){setBusy(false);alert('生成失敗：'+e.message);}}
+function pollJob(id){pollT=setInterval(async()=>{try{const job=await (await fetch(`${API}/jobs/${id}`)).json();updateThumb(job);
+  if(job.status==='done'){clearInterval(pollT);showImage(job);setBusy(false);}
+  else if(job.status==='failed'){clearInterval(pollT);setBusy(false);alert('生成失敗：'+(job.error||'?'));}}catch{}},1500);}
+function setBusy(b){document.getElementById('gen-btn').disabled=b;const o=document.getElementById('overlay');
+  if(b){o.classList.add('show');t0=Date.now();document.getElementById('bar').style.width='0%';tickProg();}else{o.classList.remove('show');clearInterval(pollT);}}
 function tickProg(){if(!document.getElementById('overlay').classList.contains('show'))return;
-  const el=(Date.now()-t0)/1000,est=estSecs();const pct=Math.min(96,el/est*100);
-  document.getElementById('bar').style.width=pct+'%';
+  const el=(Date.now()-t0)/1000,est=estSecs();document.getElementById('bar').style.width=Math.min(96,el/est*100)+'%';
   const f=s=>s>=60?`${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}`:`${Math.round(s)}s`;
-  document.getElementById('ptext').textContent=`已用 ${f(el)} · 預估 ${f(est)}`;
-  setTimeout(tickProg,500);}
-function updateProg(job){if(job.status!=='running')return;}
+  document.getElementById('ptext').textContent=`已用 ${f(el)} · 預估 ${f(est)}`;setTimeout(tickProg,500);}
 function estSecs(){const base=57,px=512*512;let t=base*Math.pow((W*H)/px,1.26);if(engine==='cpu')t*=6;return t;}
-
-function showImage(job){const img=document.getElementById('preview-img');
-  img.src=`${API}/images/${job.job_id}?t=${Date.now()}`;img.style.display='block';
-  document.getElementById('ph').style.display='none';
-  document.getElementById('imgbar').classList.add('show');
-  const m=document.getElementById('imgmeta');m.style.display='block';
-  m.textContent=`${job.width}×${job.height} · seed ${job.seed} · ${job.duration_seconds}s · ${job.engine||engine}`;
+function showImage(job){const img=document.getElementById('preview-img');img.src=`${API}/images/${job.job_id}?t=${Date.now()}`;img.style.display='block';
+  document.getElementById('ph').style.display='none';document.getElementById('imgbar').classList.add('show');
+  const m=document.getElementById('imgmeta');m.style.display='block';m.textContent=`${job.width}×${job.height} · seed ${job.seed} · ${job.duration_seconds}s · ${job.engine||engine}`;
   curJob=job.job_id;curSeed=job.seed;curW=job.width;curH=job.height;curPrompt=job.prompt;curNeg=job.negative_prompt;}
-let curW,curH,curPrompt,curNeg;
-
-// image actions
 function dlCurrent(){if(!curJob)return;const a=document.createElement('a');a.href=`${API}/images/${curJob}`;a.download='';a.click();}
-function reuseSeed(){if(curSeed>=0)document.getElementById('seed').value=curSeed;}
-function regen(){if(curPrompt){document.getElementById('prompt').value=curPrompt;document.getElementById('negative').value=curNeg||'';generate();}}
+function reuseSeed(){if(curSeed>=0){document.getElementById('seed').value=curSeed;tab('set');}}
+function regen(){if(curPrompt){generate();}}
 
-// ---------- history ----------
+// ---- history ----
 function addThumb(job){const h=document.getElementById('history');const e=h.querySelector('.empty');if(e)e.remove();
   const d=document.createElement('div');d.className='thumb active';d.id='t-'+job.job_id;
   d.innerHTML=`<div class="st busy">生成中</div><button class="del" onclick="event.stopPropagation();delJob('${job.job_id}')">×</button>`;
-  d.onclick=()=>viewJob(job.job_id);
-  document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('active'));
-  h.prepend(d);}
+  d.onclick=()=>viewJob(job.job_id);document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('active'));h.prepend(d);}
 function updateThumb(job){const d=document.getElementById('t-'+job.job_id);if(!d)return;
   if(job.status==='done'){d.innerHTML=`<img src="${API}/images/${job.job_id}?t=${Date.now()}"><button class="del" onclick="event.stopPropagation();delJob('${job.job_id}')">×</button>`;d.onclick=()=>viewJob(job.job_id);}
   else if(job.status==='failed'){d.querySelector('.st').className='st fail';d.querySelector('.st').textContent='失敗';}}
 async function viewJob(id){try{const job=await (await fetch(`${API}/jobs/${id}`)).json();if(job.status==='done'){showImage(job);
   document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('active'));document.getElementById('t-'+id)?.classList.add('active');}}catch{}}
-async function delJob(id){try{await fetch(`${API}/jobs/${id}`,{method:'DELETE'});}catch{}
-  document.getElementById('t-'+id)?.remove();
-  if(curJob===id){document.getElementById('preview-img').style.display='none';document.getElementById('ph').style.display='flex';
-    document.getElementById('imgbar').classList.remove('show');document.getElementById('imgmeta').style.display='none';}
-  if(!document.querySelectorAll('.thumb').length){document.getElementById('history').innerHTML='<span class="empty">尚無生成記錄</span>';}}
+async function delJob(id){try{await fetch(`${API}/jobs/${id}`,{method:'DELETE'});}catch{}document.getElementById('t-'+id)?.remove();
+  if(curJob===id){document.getElementById('preview-img').style.display='none';document.getElementById('ph').style.display='flex';document.getElementById('imgbar').classList.remove('show');document.getElementById('imgmeta').style.display='none';}
+  if(!document.querySelectorAll('.thumb').length)document.getElementById('history').innerHTML='<span class="empty">尚無生成記錄</span>';}
 
-// ---------- tabs / log / folder ----------
+// ---- views ----
 function tab(t){document.getElementById('tab-gen').classList.toggle('active',t==='gen');
   document.getElementById('tab-log').classList.toggle('active',t==='log');
+  document.getElementById('tab-set').classList.toggle('active',t==='set');
   document.getElementById('view-gen').style.display=t==='gen'?'flex':'none';
   document.getElementById('view-log').style.display=t==='log'?'block':'none';
+  document.getElementById('view-set').style.display=t==='set'?'block':'none';
   clearInterval(logT);if(t==='log'){refreshLog();logT=setInterval(refreshLog,2000);}}
 async function refreshLog(){try{const d=await (await fetch(`${API}/logs`)).json();
   document.getElementById('logc').innerHTML=`<div class="logh">引擎：${d.engine||'-'}　狀態：${d.state||'-'}</div><div class="logh">應用程式記錄</div>${esc(d.app)}<div class="logh">生圖引擎記錄</div>${esc(d.sd_server)}`;}catch{}}
 function esc(s){return (s||'').replace(/</g,'&lt;')}
 async function openOut(){try{await fetch(`${API}/open_output`,{method:'POST'});}catch{}}
+async function loadOutdir(){try{const d=await (await fetch(`${API}/output_dir`)).json();document.getElementById('outdir').value=d.path||'';}catch{}}
+async function saveOutdir(){const v=document.getElementById('outdir').value.trim();
+  try{await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({output_dir:v})});
+    const m=document.getElementById('outsaved');m.textContent='已儲存 ✓';setTimeout(()=>m.textContent='',2000);}catch(e){alert('儲存失敗：'+e.message);}}
 
-// ---------- model setup ----------
-async function checkModels(){try{const d=await (await fetch(`${API}/config`)).json();
-  document.getElementById('setup-dir').value=d.model_dir||'';
-  if(!d.models_ready){if(d.missing?.length)document.getElementById('setup-miss').textContent='缺少：'+d.missing.join('、');
-    document.getElementById('setup').classList.add('show');return false;}return true;}catch{return false;}}
-async function saveDir(){const dir=document.getElementById('setup-dir').value.trim();if(!dir)return;
-  const st=document.getElementById('setup-status');st.textContent='儲存中…';
+// ---- model setup ----
+async function checkModels(){try{const d=await (await fetch(`${API}/config`)).json();document.getElementById('setup-dir').value=d.model_dir||'';
+  if(!d.models_ready){if(d.missing?.length)document.getElementById('setup-miss').textContent='缺少：'+d.missing.join('、');document.getElementById('setup').classList.add('show');return false;}return true;}catch{return false;}}
+async function saveDir(){const dir=document.getElementById('setup-dir').value.trim();if(!dir)return;const st=document.getElementById('setup-status');st.textContent='儲存中…';
   try{const d=await (await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir})})).json();
-    if(d.models_ready){document.getElementById('setup').classList.remove('show');checkReady();}
-    else{const c=await (await fetch(`${API}/config`)).json();document.getElementById('setup-miss').textContent='缺少：'+(c.missing||[]).join('、');st.textContent='該資料夾找不到模型。';}}
+    if(d.models_ready){document.getElementById('setup').classList.remove('show');checkReady();}else{const c=await (await fetch(`${API}/config`)).json();document.getElementById('setup-miss').textContent='缺少：'+(c.missing||[]).join('、');st.textContent='該資料夾找不到模型。';}}
   catch(e){st.textContent='錯誤：'+e.message;}}
-async function dlModels(){const dir=document.getElementById('setup-dir').value.trim();
-  if(dir)await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir})});
+async function dlModels(){const dir=document.getElementById('setup-dir').value.trim();if(dir)await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir})});
   await fetch(`${API}/download_models`,{method:'POST'});const st=document.getElementById('setup-status');
   const tm=setInterval(async()=>{try{const d=await (await fetch(`${API}/download_status`)).json();
-    if(d.error){st.textContent='下載失敗：'+d.error;clearInterval(tm);}
-    else if(d.done){st.textContent='下載完成！啟動中…';clearInterval(tm);setTimeout(()=>{document.getElementById('setup').classList.remove('show');checkReady();},1200);}
-    else if(d.active){st.textContent=`下載中 ${d.file} … ${d.pct}%`;}}catch{}},1000);}
+    if(d.error){st.textContent='下載失敗：'+d.error;clearInterval(tm);}else if(d.done){st.textContent='下載完成！啟動中…';clearInterval(tm);setTimeout(()=>{document.getElementById('setup').classList.remove('show');checkReady();},1200);}else if(d.active){st.textContent=`下載中 ${d.file} … ${d.pct}%`;}}catch{}},1000);}
 
 // init
+document.getElementById('prompt').addEventListener('input',updateFull);
 document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();generate();}});
+renderTags();updateFull();loadOutdir();
 checkModels().then(ok=>{if(ok)checkReady();});
 </script>
 </body>

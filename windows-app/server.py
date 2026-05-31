@@ -46,14 +46,12 @@ else:
 
 ROOT       = APP_DIR
 EXE_NAME   = "sd-server.exe" if os.name == "nt" else "sd-server"
-# Generated images go to the user's Pictures folder (cross-platform), not
-# inside the app bundle — easy to find and survives app updates.
-OUTPUT_DIR = Path.home() / "Pictures" / "ZImageGen"
+# Default output folder (user can override in Settings); kept in Pictures
+# so it's easy to find and survives app updates.
+DEFAULT_OUTPUT_DIR = Path.home() / "Pictures" / "AiG"
 LOG_DIR    = ROOT / "logs"
 STATIC_DIR = BUNDLE_DIR / "static"
 CONFIG_FILE = ROOT / "config.json"
-
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
 
 # Engine candidates, tried in order: fastest GPU first, then CPU fallback.
@@ -92,6 +90,17 @@ def get_model_dir() -> Path:
     cfg = load_config()
     p = cfg.get("model_dir")
     return Path(p) if p else DEFAULT_MODEL_DIR
+
+def get_output_dir() -> Path:
+    cfg = load_config()
+    p = cfg.get("output_dir")
+    d = Path(p) if p else DEFAULT_OUTPUT_DIR
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        d = DEFAULT_OUTPUT_DIR
+        d.mkdir(parents=True, exist_ok=True)
+    return d
 
 def model_paths():
     d = get_model_dir()
@@ -313,7 +322,7 @@ def sd_alive() -> bool:
         return False
 
 
-def _make_filename(prompt: str, job_id: str) -> str:
+def _make_filename(prompt: str, job_id: str, out_dir: Path) -> str:
     """YYYYMMDD_HHMMSS_<prompt-slug>.png — sortable and recognisable.
     Keeps CJK/letters/digits; replaces filesystem-unsafe chars; falls back
     to a short id to avoid same-second collisions."""
@@ -321,7 +330,7 @@ def _make_filename(prompt: str, job_id: str) -> str:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     slug = re.sub(r'[\\/:*?"<>|\s]+', "-", (prompt or "").strip())[:40].strip("-")
     name = f"{ts}_{slug}" if slug else ts
-    if (OUTPUT_DIR / f"{name}.png").exists():
+    if (out_dir / f"{name}.png").exists():
         name = f"{name}_{job_id[:6]}"
     return f"{name}.png"
 
@@ -345,7 +354,8 @@ def worker():
         job["started_at"] = datetime.now().isoformat()
         log.info("[%s] start: %s…", job_id[:8], job["prompt"][:60])
 
-        out_path = OUTPUT_DIR / _make_filename(job["prompt"], job_id)
+        out_dir = get_output_dir()
+        out_path = out_dir / _make_filename(job["prompt"], job_id, out_dir)
         t0 = time.monotonic()
 
         payload = {
@@ -580,14 +590,15 @@ def loadprogress():
 
 
 class ConfigRequest(BaseModel):
-    model_dir: str
+    model_dir: Optional[str] = None
+    output_dir: Optional[str] = None
 
 @app.get("/config")
 def get_config_endpoint():
-    cfg = load_config()
     m = model_paths()
     return {
         "model_dir": str(m["dir"]),
+        "output_dir": str(get_output_dir()),
         "models_ready": models_ready(),
         "missing": [
             f for f, p in [("z_image_turbo-Q4_K.gguf", m["diff"]),
@@ -599,15 +610,17 @@ def get_config_endpoint():
 
 @app.post("/config")
 def set_config_endpoint(req: ConfigRequest):
-    p = Path(req.model_dir)
     cfg = load_config()
-    cfg["model_dir"] = str(p)
+    if req.model_dir is not None:
+        cfg["model_dir"] = str(Path(req.model_dir))
+    if req.output_dir is not None:
+        cfg["output_dir"] = str(Path(req.output_dir))
     save_config(cfg)
     ready = models_ready()
     # Models just became available → bring the engine up.
     if ready and sd_status.get("state") not in ("ready", "starting"):
         threading.Thread(target=start_sd_server, daemon=True).start()
-    return {"model_dir": str(p), "models_ready": ready}
+    return {"model_dir": str(get_model_dir()), "output_dir": str(get_output_dir()), "models_ready": ready}
 
 
 @app.get("/logs")
@@ -676,20 +689,20 @@ def download_status():
 
 @app.get("/output_dir")
 def output_dir():
-    return {"path": str(OUTPUT_DIR)}
+    return {"path": str(get_output_dir())}
 
 
 @app.post("/open_output")
 def open_output():
     try:
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        d = get_output_dir()
         if sys.platform == "darwin":
-            subprocess.run(["open", str(OUTPUT_DIR)])
+            subprocess.run(["open", str(d)])
         elif os.name == "nt":
-            os.startfile(str(OUTPUT_DIR))   # type: ignore[attr-defined]
+            os.startfile(str(d))   # type: ignore[attr-defined]
         else:
-            subprocess.run(["xdg-open", str(OUTPUT_DIR)])
-        return {"ok": True, "path": str(OUTPUT_DIR)}
+            subprocess.run(["xdg-open", str(d)])
+        return {"ok": True, "path": str(d)}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
