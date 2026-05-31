@@ -27,25 +27,37 @@ function backendCmd() {
   return { cmd: py, args: [script], cwd: path.join(__dirname, '..', 'windows-app') };
 }
 
+let backendLog = '';          // recent backend output, shown if startup fails
+let backendExit = null;
+function logBackend(s) {
+  backendLog = (backendLog + s).slice(-4000);
+}
 function startBackend() {
   const { cmd, args, cwd } = backendCmd();
-  console.log('[main] launching backend:', cmd, args.join(' '));
-  backend = spawn(cmd, args, {
-    cwd,
-    env: { ...process.env, PORT: String(PORT), ELECTRON_PID: String(process.pid) },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
-  });
-  backend.stdout.on('data', d => process.stdout.write(`[py] ${d}`));
-  backend.stderr.on('data', d => process.stderr.write(`[py] ${d}`));
+  logBackend(`launching: ${cmd}\ncwd: ${cwd}\n`);
+  try {
+    backend = spawn(cmd, args, {
+      cwd,
+      env: { ...process.env, PORT: String(PORT), ELECTRON_PID: String(process.pid) },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+  } catch (e) {
+    logBackend(`spawn failed: ${e}\n`);
+    return;
+  }
+  backend.stdout.on('data', d => { logBackend(d.toString()); process.stdout.write(`[py] ${d}`); });
+  backend.stderr.on('data', d => { logBackend(d.toString()); process.stderr.write(`[py] ${d}`); });
+  backend.on('error', e => logBackend(`process error: ${e}\n`));
   backend.on('exit', (code) => {
-    console.log('[main] backend exited:', code);
+    backendExit = code;
+    logBackend(`\n[backend exited, code=${code}]\n`);
     backend = null;
   });
 }
 
 // --- Wait until the server answers /health --------------------------------
-function waitForHealth(timeoutMs = 60000, interval = 400) {
+function waitForHealth(timeoutMs = 180000, interval = 500) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
     const ping = () => {
@@ -86,13 +98,19 @@ async function createWindow() {
   });
 
   try {
-    await waitForHealth();
     await win.webContents.session.clearCache();          // never show a stale cached UI
+    await waitForHealth();
     await win.loadURL(`${BASE}/?v=${Date.now()}`);        // cache-bust the page load
   } catch (e) {
-    await win.loadURL('data:text/html,' + encodeURIComponent(
-      `<body style="background:#0f0f12;color:#e05050;font-family:sans-serif;padding:40px">
-       <h2>無法啟動生圖伺服器</h2><pre>${String(e)}</pre></body>`));
+    const html =
+      `<!doctype html><meta charset="utf-8">
+       <body style="background:#0f0f12;color:#e9e9f1;font-family:-apple-system,'Microsoft JhengHei',sans-serif;padding:36px">
+       <h2 style="color:#e05050">無法啟動生圖伺服器</h2>
+       <p>${String(e)}${backendExit !== null ? `（後端已結束，代碼 ${backendExit}）` : ''}</p>
+       <p style="color:#8b8ba0;font-size:13px">後端輸出（供除錯）：</p>
+       <pre style="background:#16161f;border:1px solid #2a2a3a;border-radius:8px;padding:14px;white-space:pre-wrap;font-size:11px;max-height:60vh;overflow:auto">${backendLog.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre>
+       </body>`;
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
   }
   win.show();
 }
