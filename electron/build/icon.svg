@@ -13,69 +13,49 @@
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.20"/>
       <stop offset="0.4" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#e7e6f1"/>
-    </linearGradient>
-    <radialGradient id="lens" cx="0.5" cy="0.42" r="0.62">
-      <stop offset="0" stop-color="#3a3550"/>
-      <stop offset="0.55" stop-color="#221d34"/>
-      <stop offset="1" stop-color="#0e0a1c"/>
-    </radialGradient>
-    <radialGradient id="glass" cx="0.40" cy="0.36" r="0.72">
-      <stop offset="0" stop-color="#a9b6ff"/>
-      <stop offset="0.45" stop-color="#5566e6"/>
-      <stop offset="1" stop-color="#120e26"/>
-    </radialGradient>
     <clipPath id="round"><rect x="64" y="64" width="896" height="896" rx="208"/></clipPath>
-    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#1c0c52" flood-opacity="0.35"/>
-    </filter>
   </defs>
 
-  <!-- background: left / right halves, two blue-purple tones (unchanged) -->
+  <!-- background: left / right blue-purple split + Apple rounded corners -->
   <g clip-path="url(#round)">
     <rect x="64"  y="64" width="448" height="896" fill="url(#bg)"/>
     <rect x="512" y="64" width="448" height="896" fill="url(#bgArt)"/>
     <rect x="64"  y="64" width="896" height="896" fill="url(#sheen)"/>
   </g>
 
-  <!-- ===== shared stand holding both (bottom) ===== -->
-  <g stroke="#c8c5de" stroke-width="26" stroke-linecap="round" fill="none">
-    <path d="M 322 650 L 268 882"/>
-    <path d="M 322 650 L 376 882"/>
-    <path d="M 702 650 L 648 882"/>
-    <path d="M 702 650 L 756 882"/>
-    <path d="M 300 798 L 724 798"/>
+  <!-- ===== LEFT: easel (line art) ===== -->
+  <g fill="none" stroke="#ffffff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
+    <!-- canvas board -->
+    <rect x="180" y="214" width="248" height="196" rx="16"/>
+    <!-- legs + back support + cross rail -->
+    <path d="M242 410 L198 642"/>
+    <path d="M366 410 L410 642"/>
+    <path d="M304 410 L304 612"/>
+    <path d="M226 300 L304 612"/>  <!-- back leg -->
+    <path d="M220 520 L388 520"/>  <!-- cross rail -->
   </g>
-  <!-- shelf / tray -->
-  <rect x="236" y="612" width="552" height="46" rx="23" fill="#dcdaee"/>
-  <rect x="236" y="612" width="552" height="16" rx="8" fill="#efeef8"/>
-
-  <!-- ===== LEFT: camera ===== -->
-  <g filter="url(#soft)">
-    <rect x="300" y="444" width="120" height="46" rx="14" fill="url(#body)"/>   <!-- viewfinder -->
-    <rect x="246" y="474" width="252" height="150" rx="34" fill="url(#body)"/>  <!-- body -->
-    <rect x="286" y="456" width="48" height="24" rx="11" fill="#d3d1e6"/>       <!-- shutter -->
-    <rect x="430" y="498" width="52" height="34" rx="10" fill="#cfd8ff"/>       <!-- flash -->
-    <circle cx="372" cy="556" r="80" fill="#2a2540"/>
-    <circle cx="372" cy="556" r="70" fill="url(#lens)"/>
-    <circle cx="372" cy="556" r="46" fill="url(#glass)"/>
-    <circle cx="350" cy="538" r="16" fill="#ffffff" opacity="0.6"/>
+  <!-- three-primary-colour cloud blobs on the board -->
+  <g>
+    <g fill="#ff4d4d"><circle cx="236" cy="312" r="17"/><circle cx="266" cy="312" r="17"/><circle cx="251" cy="296" r="22"/><circle cx="251" cy="320" r="15"/></g>
+    <g fill="#ffd23d"><circle cx="316" cy="300" r="15"/><circle cx="342" cy="300" r="15"/><circle cx="329" cy="286" r="20"/><circle cx="329" cy="312" r="13"/></g>
+    <g fill="#3a6ff0"><circle cx="284" cy="356" r="16"/><circle cx="312" cy="356" r="16"/><circle cx="298" cy="342" r="21"/><circle cx="298" cy="368" r="14"/></g>
   </g>
 
-  <!-- ===== RIGHT: portrait art board with seven-colour rainbow ===== -->
-  <g filter="url(#soft)">
-    <rect x="556" y="350" width="198" height="268" rx="24" fill="#f5f4fc"/>
-    <rect x="556" y="350" width="198" height="268" rx="24" fill="none" stroke="#d9d7ec" stroke-width="6"/>
-    <g fill="none" stroke-linecap="round" stroke-width="11">
-      <path d="M 571 580 A 84 84 0 0 1 739 580" stroke="#ff4d4d"/>
-      <path d="M 583 580 A 72 72 0 0 1 727 580" stroke="#ff9a3d"/>
-      <path d="M 595 580 A 60 60 0 0 1 715 580" stroke="#ffd23d"/>
-      <path d="M 607 580 A 48 48 0 0 1 703 580" stroke="#3ddc84"/>
-      <path d="M 619 580 A 36 36 0 0 1 691 580" stroke="#36a5f0"/>
-      <path d="M 631 580 A 24 24 0 0 1 679 580" stroke="#5b6cf0"/>
-      <path d="M 643 580 A 12 12 0 0 1 667 580" stroke="#a05cf0"/>
-    </g>
+  <!-- ===== RIGHT: camera (line art) ===== -->
+  <g fill="none" stroke="#ffffff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
+    <!-- viewfinder hump -->
+    <path d="M676 286 h84 v34 h-84 z"/>
+    <!-- body -->
+    <rect x="600" y="320" width="272" height="200" rx="34"/>
+    <!-- lens -->
+    <circle cx="736" cy="424" r="68"/>
+    <circle cx="736" cy="424" r="34"/>
+    <!-- flash dot -->
+    <circle cx="640" cy="362" r="9" fill="#ffffff" stroke="none"/>
   </g>
+
+  <!-- ===== bottom: AG (white, centred) ===== -->
+  <text x="512" y="836" text-anchor="middle" fill="#ffffff"
+        font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="168" font-weight="800" letter-spacing="6">AG</text>
 </svg>
