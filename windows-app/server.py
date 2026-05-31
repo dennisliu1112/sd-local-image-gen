@@ -845,8 +845,8 @@ def open_output():
 def index():
     idx = STATIC_DIR / "index.html"
     if idx.exists():
-        return FileResponse(str(idx))
-    return HTMLResponse("<h1>Z-Image Generator</h1><p>static/index.html not found</p>")
+        return FileResponse(str(idx), headers={"Cache-Control": "no-store, max-age=0"})
+    return HTMLResponse("<h1>Amazing image Generator</h1><p>static/index.html not found</p>")
 
 
 # ---------------------------------------------------------------------------

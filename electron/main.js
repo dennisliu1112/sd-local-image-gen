@@ -87,7 +87,8 @@ async function createWindow() {
 
   try {
     await waitForHealth();
-    await win.loadURL(BASE);
+    await win.webContents.session.clearCache();          // never show a stale cached UI
+    await win.loadURL(`${BASE}/?v=${Date.now()}`);        // cache-bust the page load
   } catch (e) {
     await win.loadURL('data:text/html,' + encodeURIComponent(
       `<body style="background:#0f0f12;color:#e05050;font-family:sans-serif;padding:40px">
