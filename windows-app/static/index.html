@@ -3,658 +3,377 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Z-Image Generator</title>
+<title>Amazing image Generator</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root{
+    --bg:#0e0e15; --panel:#16161f; --panel2:#1b1b27; --line:#2a2a3a;
+    --txt:#e9e9f1; --muted:#8b8ba0; --faint:#5a5a70;
+    --accent:#7c5cfc; --accent2:#9b7bff;
+    --r1:#ff4d4d; --y1:#ffd23d; --b1:#2f6bf0;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
+    background:var(--bg); color:var(--txt); height:100dvh; display:flex; flex-direction:column; overflow:hidden;
+  }
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#2e2e40;border-radius:99px}
+  ::-webkit-scrollbar-track{background:transparent}
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: #0f0f12;
-    color: #e8e8ec;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
+  /* ---------- Header ---------- */
+  header{
+    height:58px; flex-shrink:0; display:flex; align-items:center; gap:14px;
+    padding:0 18px; border-bottom:1px solid var(--line); background:var(--panel);
   }
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo svg{width:30px;height:30px;display:block}
+  .logo b{font-size:17px;font-weight:800;letter-spacing:.5px}
+  .logo b i{color:var(--accent2);font-style:normal}
+  .badge{
+    display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);
+    background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:5px 12px;
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:#555;flex-shrink:0}
+  .dot.ready{background:#4caf80}.dot.busy{background:#f5a623;animation:pulse 1s infinite}.dot.err{background:#e05050}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .spacer{flex:1}
+  .tabs{display:flex;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}
+  .tab{border:none;background:transparent;color:var(--muted);font-size:13px;padding:6px 16px;border-radius:8px;cursor:pointer}
+  .tab.active{background:var(--accent);color:#fff;font-weight:600}
+  .icon-btn{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:10px;padding:7px 12px;font-size:13px;cursor:pointer}
+  .icon-btn:hover{color:var(--txt);border-color:#3a3a4e}
 
-  /* ── Header ── */
-  header {
-    padding: 12px 20px;
-    border-bottom: 1px solid #222230;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
-  }
-  header h1 { font-size: 16px; font-weight: 600; color: #c8b8ff; }
-  #status-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #444; flex-shrink: 0;
-    transition: background .4s;
-  }
-  #status-dot.ready  { background: #4caf80; }
-  #status-dot.busy   { background: #f5a623; animation: pulse 1s infinite; }
-  #status-dot.error  { background: #e05050; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-  #status-text { font-size: 12px; color: #888; }
+  /* ---------- Layout ---------- */
+  #view-gen{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  main{flex:1;display:flex;overflow:hidden}
 
-  /* ── Main layout ── */
-  main {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-  }
+  /* Controls */
+  .controls{width:372px;flex-shrink:0;border-right:1px solid var(--line);background:var(--panel);
+    overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:18px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:7px;font-weight:600;letter-spacing:.3px}
+  textarea,input,select{font-family:inherit}
+  #prompt{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--txt);
+    font-size:14px;padding:13px 14px;resize:vertical;min-height:96px;outline:none;line-height:1.55}
+  #prompt:focus{border-color:var(--accent)}
+  #negative{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--muted);
+    font-size:12px;padding:9px 12px;resize:vertical;min-height:42px;outline:none}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .chip{font-size:11.5px;color:var(--accent2);background:#1f1934;border:1px solid #322a52;border-radius:99px;
+    padding:5px 11px;cursor:pointer;white-space:nowrap}
+  .chip:hover{background:#271f44}
+  .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+  .seg button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;
+    padding:9px 4px;font-size:12px;cursor:pointer;text-align:center;line-height:1.3}
+  .seg button .sub{display:block;font-size:9.5px;color:var(--faint)}
+  .seg button.on{border-color:var(--accent);background:#211b3a;color:var(--txt)}
+  .row{display:flex;align-items:center;gap:12px}
+  .row input[type=range]{flex:1;accent-color:var(--accent)}
+  .val{font-size:13px;color:var(--txt);min-width:30px;text-align:right}
+  #seed{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 11px;font-size:13px;outline:none}
+  .mini{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:8px;padding:8px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+  .mini:hover{color:var(--txt)}
+  #gen-btn{margin-top:2px;width:100%;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;
+    color:#fff;background:linear-gradient(135deg,#9b7bff,#6a3df0);box-shadow:0 6px 20px rgba(108,61,240,.35);transition:.15s}
+  #gen-btn:hover:not(:disabled){filter:brightness(1.08)}
+  #gen-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
 
-  /* ── Left: history ── */
-  #history-panel {
-    width: 220px;
-    flex-shrink: 0;
-    border-right: 1px solid #222230;
-    overflow-y: auto;
-    padding: 12px 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  #history-panel h2 { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: .06em; padding: 0 4px 6px; }
-  .hist-thumb {
-    cursor: pointer;
-    border-radius: 6px;
-    overflow: hidden;
-    border: 2px solid transparent;
-    transition: border-color .2s;
-  }
-  .hist-thumb:hover, .hist-thumb.active { border-color: #7c5cfc; }
-  .hist-thumb img { width: 100%; display: block; }
-  .hist-thumb .hist-meta { font-size: 10px; color: #666; padding: 4px 6px; }
-  .hist-thumb.pending .hist-meta { color: #f5a623; }
-  .hist-thumb.failed  .hist-meta { color: #e05050; }
+  /* Preview */
+  .preview{flex:1;display:flex;align-items:center;justify-content:center;position:relative;padding:28px;overflow:hidden}
+  #preview-img{max-width:100%;max-height:100%;border-radius:16px;display:none;box-shadow:0 12px 50px rgba(0,0,0,.55)}
+  .placeholder{display:flex;flex-direction:column;align-items:center;gap:14px;color:#33333f}
+  .placeholder p{font-size:14px;color:var(--faint)}
+  #overlay{position:absolute;inset:28px;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:rgba(14,14,21,.82);border-radius:16px}
+  #overlay.show{display:flex}
+  .barwrap{width:300px;height:5px;background:#23232f;border-radius:99px;overflow:hidden}
+  #bar{height:100%;width:0;background:linear-gradient(90deg,#9b7bff,#6a3df0);transition:width .5s}
+  #ptext{font-size:13px;color:var(--muted)}
+  .imgbar{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:none;gap:8px;
+    background:rgba(22,22,31,.92);border:1px solid var(--line);border-radius:12px;padding:7px}
+  .imgbar.show{display:flex}
+  .imgbar button{border:none;background:transparent;color:var(--muted);font-size:12.5px;padding:7px 12px;border-radius:8px;cursor:pointer}
+  .imgbar button:hover{background:#23232f;color:var(--txt)}
+  .imgmeta{position:absolute;top:24px;left:50%;transform:translateX(-50%);font-size:11.5px;color:var(--faint);background:rgba(22,22,31,.8);padding:5px 12px;border-radius:99px;display:none}
 
-  /* ── Center: preview ── */
-  #preview-panel {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    position: relative;
-    overflow: hidden;
-  }
-  #preview-img {
-    max-width: 100%;
-    max-height: 100%;
-    border-radius: 12px;
-    object-fit: contain;
-    display: none;
-    box-shadow: 0 8px 40px rgba(0,0,0,.6);
-  }
-  #preview-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    color: #333;
-  }
-  #preview-placeholder svg { opacity: .4; }
-  #preview-placeholder p { font-size: 14px; }
-  #progress-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(15,15,18,.85);
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    border-radius: 12px;
-  }
-  #progress-overlay.show { display: flex; }
-  #progress-bar-wrap { width: 280px; background: #222; border-radius: 99px; height: 4px; }
-  #progress-bar { height: 100%; border-radius: 99px; background: #7c5cfc; transition: width .5s; width: 0%; }
-  #progress-text { font-size: 13px; color: #aaa; }
+  /* History strip */
+  .history{flex-shrink:0;height:128px;border-top:1px solid var(--line);background:var(--panel);
+    display:flex;align-items:center;gap:10px;padding:0 16px;overflow-x:auto}
+  .history .empty{color:var(--faint);font-size:12.5px}
+  .thumb{position:relative;height:92px;width:92px;border-radius:11px;overflow:hidden;flex-shrink:0;cursor:pointer;
+    border:2px solid transparent;background:var(--panel2)}
+  .thumb.active{border-color:var(--accent)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .st{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted)}
+  .thumb .st.busy{color:var(--y1)} .thumb .st.fail{color:var(--r1)}
+  .thumb .del{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);
+    color:#fff;border:none;font-size:11px;line-height:18px;cursor:pointer;display:none}
+  .thumb:hover .del{display:block}
 
-  /* ── Bottom: input ── */
-  #input-panel {
-    flex-shrink: 0;
-    border-top: 1px solid #222230;
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  #prompt-row { display: flex; gap: 8px; align-items: flex-end; }
-  #prompt {
-    flex: 1;
-    background: #1a1a22;
-    border: 1px solid #2e2e40;
-    border-radius: 10px;
-    color: #e8e8ec;
-    font-size: 14px;
-    padding: 10px 14px;
-    resize: none;
-    outline: none;
-    min-height: 44px;
-    max-height: 120px;
-    transition: border-color .2s;
-    line-height: 1.5;
-  }
-  #prompt:focus { border-color: #7c5cfc; }
-  #prompt::placeholder { color: #444; }
-  #negative {
-    flex: 1;
-    background: #1a1a22;
-    border: 1px solid #2e2e40;
-    border-radius: 8px;
-    color: #888;
-    font-size: 12px;
-    padding: 7px 12px;
-    resize: none;
-    outline: none;
-    height: 32px;
-    transition: border-color .2s;
-  }
-  #negative:focus { border-color: #555; }
-  #negative::placeholder { color: #383848; }
+  /* Log view */
+  #view-log{flex:1;display:none;overflow:auto;padding:18px 22px}
+  #view-log pre{font-size:11.5px;color:#9aa3b2;white-space:pre-wrap;word-break:break-all;
+    font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5}
+  .logh{color:var(--accent2);font-size:12px;margin:16px 0 6px;font-weight:600}.logh:first-child{margin-top:0}
 
-  #controls-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .ctrl-label { font-size: 11px; color: #555; }
-  select, input[type=number], input[type=range] {
-    background: #1a1a22;
-    border: 1px solid #2e2e40;
-    color: #ccc;
-    border-radius: 6px;
-    font-size: 12px;
-    padding: 4px 8px;
-    outline: none;
-  }
-  select { cursor: pointer; }
-  input[type=number] { width: 70px; }
-  input[type=range] { width: 80px; accent-color: #7c5cfc; }
-  .ctrl-val { font-size: 12px; color: #888; min-width: 24px; }
-
-  #gen-btn {
-    margin-left: auto;
-    background: #7c5cfc;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    padding: 10px 24px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background .2s, opacity .2s;
-    white-space: nowrap;
-  }
-  #gen-btn:hover:not(:disabled) { background: #9474ff; }
-  #gen-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-  /* scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2e2e40; border-radius: 99px; }
-
-  /* ── Setup overlay ── */
-  #setup-overlay {
-    display: none;
-    position: fixed; inset: 0; z-index: 100;
-    background: #0f0f12;
-    align-items: center; justify-content: center;
-  }
-  #setup-overlay.show { display: flex; }
-  #setup-box {
-    background: #16161f;
-    border: 1px solid #2e2e40;
-    border-radius: 16px;
-    padding: 40px 48px;
-    width: 520px;
-    max-width: 95vw;
-  }
-  #setup-box h2 { font-size: 20px; color: #c8b8ff; margin-bottom: 8px; }
-  #setup-box p  { font-size: 13px; color: #666; margin-bottom: 28px; line-height: 1.6; }
-  .setup-field  { margin-bottom: 20px; }
-  .setup-field label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; }
-  .setup-field input {
-    width: 100%; background: #1a1a22; border: 1px solid #2e2e40;
-    border-radius: 8px; color: #e8e8ec; font-size: 13px;
-    padding: 10px 14px; outline: none;
-  }
-  .setup-field input:focus { border-color: #7c5cfc; }
-  .setup-hint { font-size: 11px; color: #444; margin-top: 5px; }
-  .setup-missing { font-size: 11px; color: #e05050; margin-top: 6px; }
-  #setup-save {
-    width: 100%; background: #7c5cfc; color: #fff; border: none;
-    border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 600;
-    cursor: pointer; margin-top: 8px; transition: background .2s;
-  }
-  #setup-save:hover { background: #9474ff; }
-  #setup-status { font-size: 12px; color: #888; text-align: center; margin-top: 12px; min-height: 18px; }
-  #setup-download {
-    width: 100%; background: transparent; color: #9474ff; border: 1px solid #3a2e60;
-    border-radius: 10px; padding: 10px; font-size: 13px; cursor: pointer; margin-top: 10px;
-  }
-  #setup-download:hover { background: #1d1830; }
-
-  /* ── Tabs ── */
-  .tab-btn {
-    background: transparent; border: 1px solid #2e2e40; color: #888;
-    border-radius: 8px; padding: 5px 14px; font-size: 12px; cursor: pointer;
-    transition: all .15s;
-  }
-  .tab-btn:hover { color: #ccc; }
-  .tab-btn.active { background: #7c5cfc; color: #fff; border-color: #7c5cfc; }
-
-  #view-gen { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-  #view-log { display: none; flex: 1; overflow: auto; padding: 16px 20px; }
-  #view-log pre {
-    font-size: 11px; color: #9aa3b2; white-space: pre-wrap; word-break: break-all;
-    font-family: ui-monospace, Menlo, Consolas, monospace; line-height: 1.5;
-  }
-  .log-section-title { color: #7c5cfc; font-size: 12px; margin: 16px 0 6px; font-weight: 600; }
-  .log-section-title:first-child { margin-top: 0; }
+  /* Setup overlay */
+  #setup{display:none;position:fixed;inset:0;z-index:100;background:rgba(10,10,16,.96);align-items:center;justify-content:center}
+  #setup.show{display:flex}
+  .setupbox{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:36px 40px;width:540px;max-width:94vw}
+  .setupbox h2{font-size:19px;margin-bottom:8px}
+  .setupbox p{font-size:13px;color:var(--muted);margin-bottom:22px;line-height:1.6}
+  .setupbox input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);font-size:13px;padding:11px 14px;outline:none}
+  .hint{font-size:11px;color:var(--faint);margin-top:6px}
+  .miss{font-size:11px;color:var(--r1);margin-top:6px}
+  .setupbox .pri{width:100%;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px}
+  .setupbox .sec{width:100%;background:transparent;color:var(--accent2);border:1px solid #3a2e60;border-radius:11px;padding:11px;font-size:13px;cursor:pointer;margin-top:10px}
+  #setup-status{font-size:12px;color:var(--muted);text-align:center;margin-top:12px;min-height:16px}
 </style>
 </head>
 <body>
 
-<!-- Setup overlay (shown when models missing) -->
-<div id="setup-overlay">
-  <div id="setup-box">
-    <h2>⚙️ Model Setup</h2>
-    <p>Models not found. Enter the folder path where your models are stored,<br>
-       or choose a location to download them (approx. 6.3 GB).</p>
-    <div class="setup-field">
-      <label>Model folder path</label>
-      <input type="text" id="setup-model-dir" placeholder="e.g. D:\AI\models">
-      <div class="setup-hint">Must contain: z_image_turbo-Q4_K.gguf, ae.safetensors, Qwen3-4B-Q4_K_M.gguf</div>
-      <div class="setup-missing" id="setup-missing-list"></div>
-    </div>
-    <button id="setup-save" onclick="saveModelDir()">儲存並繼續</button>
-    <button id="setup-download" onclick="downloadModels()">下載模型（約 6.3 GB）</button>
+<!-- Setup overlay -->
+<div id="setup">
+  <div class="setupbox">
+    <h2>⚙️ 模型設定</h2>
+    <p>找不到模型。輸入你存放模型的資料夾路徑，或下載模型（約 6.3 GB）。</p>
+    <input type="text" id="setup-dir" placeholder="例如 D:\AI\models">
+    <div class="hint">需包含：z_image_turbo-Q4_K.gguf、ae.safetensors、Qwen3-4B-Q4_K_M.gguf</div>
+    <div class="miss" id="setup-miss"></div>
+    <button class="pri" onclick="saveDir()">儲存並繼續</button>
+    <button class="sec" onclick="dlModels()">下載模型（約 6.3 GB）</button>
     <div id="setup-status"></div>
   </div>
 </div>
 
 <header>
-  <div id="status-dot"></div>
-  <h1>Z-Image Generator</h1>
-  <span id="status-text">連線中…</span>
-  <div style="margin-left:auto; display:flex; gap:6px">
-    <button class="tab-btn" id="open-folder" onclick="openOutput()" title="開啟出圖資料夾">📂 出圖資料夾</button>
-    <button class="tab-btn active" id="tab-gen" onclick="switchTab('gen')">生成</button>
-    <button class="tab-btn" id="tab-log" onclick="switchTab('log')">記錄</button>
+  <div class="logo">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <g>
+        <path d="M50 50 C46 46 41 44 38 41 C35 37 41 35 50 44 C59 35 65 37 62 41 C59 44 54 46 50 50 Z" fill="#ff4d4d"/>
+        <g transform="rotate(120 50 50)"><path d="M50 50 C46 46 41 44 38 41 C35 37 41 35 50 44 C59 35 65 37 62 41 C59 44 54 46 50 50 Z" fill="#ffd23d"/></g>
+        <g transform="rotate(240 50 50)"><path d="M50 50 C46 46 41 44 38 41 C35 37 41 35 50 44 C59 35 65 37 62 41 C59 44 54 46 50 50 Z" fill="#2f6bf0"/></g>
+      </g>
+    </svg>
+    <b>A<i>i</i>G</b>
   </div>
+  <div class="badge"><span class="dot" id="dot"></span><span id="status">連線中…</span></div>
+  <div class="spacer"></div>
+  <div class="tabs">
+    <button class="tab active" id="tab-gen" onclick="tab('gen')">生成</button>
+    <button class="tab" id="tab-log" onclick="tab('log')">記錄</button>
+  </div>
+  <button class="icon-btn" onclick="openOut()">📂 出圖資料夾</button>
 </header>
 
 <div id="view-gen">
-<main>
-  <!-- Left: history -->
-  <div id="history-panel">
-    <h2>歷史記錄</h2>
-    <div id="history-list"></div>
-  </div>
+  <main>
+    <!-- Controls -->
+    <aside class="controls">
+      <div class="field">
+        <label>描述（要生成什麼）</label>
+        <textarea id="prompt" placeholder="例如：a girl on the beach at sunset, photorealistic"></textarea>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="field">
+        <label>不想要的內容（負面，可留空）</label>
+        <textarea id="negative" placeholder="blurry, bad anatomy, lowres"></textarea>
+      </div>
+      <div class="field">
+        <label>解析度</label>
+        <div class="seg" id="resseg"></div>
+      </div>
+      <div class="field">
+        <label>步數 Steps <span class="val" id="stepsv" style="float:right">4</span></label>
+        <div class="row"><input type="range" id="steps" min="1" max="20" value="4" oninput="stepsv.textContent=this.value"></div>
+      </div>
+      <div class="field">
+        <label>種子 Seed（-1 為隨機）</label>
+        <div class="row">
+          <input id="seed" type="number" value="-1" min="-1">
+          <button class="mini" onclick="seed.value=Math.floor(Math.random()*4294967295)">🎲</button>
+        </div>
+      </div>
+      <button id="gen-btn" onclick="generate()" disabled>生成圖片</button>
+    </aside>
 
-  <!-- Center: preview -->
-  <div id="preview-panel">
-    <div id="preview-placeholder">
-      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-        <rect x="3" y="3" width="18" height="18" rx="3"/>
-        <circle cx="8.5" cy="8.5" r="1.5"/>
-        <path d="m21 15-5-5L5 21"/>
-      </svg>
-      <p>輸入描述後點擊生成</p>
-    </div>
-    <img id="preview-img" alt="生成結果">
-    <div id="progress-overlay">
-      <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
-      <div id="progress-text">準備中…</div>
-    </div>
-  </div>
-</main>
+    <!-- Preview -->
+    <section class="preview">
+      <div class="placeholder" id="ph">
+        <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1">
+          <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
+        </svg>
+        <p>輸入描述後按「生成圖片」</p>
+      </div>
+      <div class="imgmeta" id="imgmeta"></div>
+      <img id="preview-img" alt="">
+      <div class="imgbar" id="imgbar">
+        <button onclick="dlCurrent()">⬇ 下載</button>
+        <button onclick="reuseSeed()">🌱 沿用種子</button>
+        <button onclick="regen()">↻ 重新生成</button>
+      </div>
+      <div id="overlay">
+        <div class="barwrap"><div id="bar"></div></div>
+        <div id="ptext">準備中…</div>
+      </div>
+    </section>
+  </main>
 
-<!-- Bottom: input -->
-<div id="input-panel">
-  <div id="prompt-row">
-    <textarea id="prompt" placeholder="描述你想生成的圖片，例如：a girl standing on a beach at sunset, photorealistic" rows="2"></textarea>
-    <button id="gen-btn" onclick="generate()">生成</button>
-  </div>
-  <div style="display:flex; gap:8px; align-items:center;">
-    <span class="ctrl-label">負面描述</span>
-    <textarea id="negative" placeholder="不想要的內容，例如：blurry, bad anatomy（可留空）"></textarea>
-  </div>
-  <div id="controls-row">
-    <span class="ctrl-label">解析度</span>
-    <select id="resolution">
-      <option value="512,512" selected>512 × 512</option>
-      <option value="768,768">768 × 768</option>
-      <option value="1024,1024">1024 × 1024</option>
-      <option value="1216,1216">1216 × 1216</option>
-      <option value="1024,1280">1024 × 1280 縱向</option>
-      <option value="1280,1024">1280 × 1024 橫向</option>
-    </select>
-
-    <span class="ctrl-label" style="margin-left:8px">Steps</span>
-    <input type="range" id="steps" min="1" max="20" value="4" oninput="document.getElementById('steps-val').textContent=this.value">
-    <span class="ctrl-val" id="steps-val">4</span>
-
-    <span class="ctrl-label" style="margin-left:8px">Seed</span>
-    <input type="number" id="seed" value="-1" min="-1" max="4294967295" title="-1 表示隨機">
-
-    <button onclick="document.getElementById('seed').value=Math.floor(Math.random()*2**32)" style="background:#1a1a22;border:1px solid #2e2e40;color:#888;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">🎲</button>
-  </div>
+  <!-- History -->
+  <div class="history" id="history"><span class="empty">尚無生成記錄</span></div>
 </div>
-</div><!-- /view-gen -->
 
-<div id="view-log">
-  <pre id="log-content">尚無記錄。</pre>
-</div>
+<div id="view-log"><pre id="logc">尚無記錄。</pre></div>
 
 <script>
-const API = '';   // same origin
-let currentJobId = null;
-let pollTimer = null;
-let genStartTime = null;
+const API='';
+let curJob=null, curSeed=-1, pollT=null, logT=null, t0=0, engine='', W=512, H=512;
 
-// ── Status polling ─────────────────────────────────────────────────────────
-async function checkReady() {
-  try {
-    const r = await fetch(`${API}/health`);
-    const d = await r.json();
-    const dot  = document.getElementById('status-dot');
-    const text = document.getElementById('status-text');
-    if (d.sd_server_ready) {
-      dot.className  = 'ready';
-      const eng = { cuda: 'CUDA GPU', vulkan: 'Vulkan GPU', gpu: 'GPU', cpu: 'CPU（較慢）' }[d.engine] || '';
-      text.textContent = eng ? `就緒 · ${eng}` : '就緒';
-      window.__engine = d.engine;
-      document.getElementById('gen-btn').disabled = false;
-    } else {
-      document.getElementById('gen-btn').disabled = true;
-      // check load progress / crash
-      let lp = {};
-      try { lp = await (await fetch(`${API}/loadprogress`)).json(); } catch {}
+// presets
+const PRESETS=[
+  ['寫實人像','portrait of a young woman, soft natural light, photorealistic, 85mm, sharp focus'],
+  ['風景','majestic mountain landscape at golden hour, ultra detailed, cinematic'],
+  ['動漫','anime style girl, vibrant colors, detailed illustration, studio ghibli'],
+  ['美食','gourmet food photography, top-down, soft studio light, appetizing'],
+  ['科幻','futuristic cyberpunk city at night, neon lights, rain, cinematic'],
+  ['可愛動物','a cute fluffy kitten, big eyes, soft lighting, highly detailed'],
+];
+const chips=document.getElementById('chips');
+PRESETS.forEach(([n,p])=>{const b=document.createElement('button');b.className='chip';b.textContent=n;
+  b.onclick=()=>{document.getElementById('prompt').value=p;};chips.appendChild(b);});
 
-      if (lp.phase === 'crashed') {
-        dot.className = 'error';
-        text.textContent = 'sd-server 啟動失敗';
-        showCrash(lp.error || '');
-        return;   // stop polling; show error
-      }
+// resolution segments
+const RES=[['512²',512,512],['768²',768,768],['1024²',1024,1024],
+  ['直 832×1216',832,1216],['橫 1216×832',1216,832],['直 1024×1280',1024,1280]];
+const resseg=document.getElementById('resseg');
+RES.forEach(([lbl,w,h],i)=>{const b=document.createElement('button');
+  b.innerHTML=lbl.replace(/(\d+×\d+|\d+²)/,'<span class="sub">$1</span>').replace(/²/,'');
+  if(/²/.test(lbl)){b.innerHTML=lbl.replace('²','')+'<span class="sub">px</span>';}
+  b.dataset.w=w;b.dataset.h=h;if(i===0)b.classList.add('on');
+  b.onclick=()=>{document.querySelectorAll('.seg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');W=w;H=h;};
+  resseg.appendChild(b);});
 
-      dot.className = 'busy';
-      let label = '模型載入中…';
-      if (lp.phase === 'loading' && lp.pct) label = `模型載入中… ${lp.pct}%`;
-      else if (lp.phase === 'warmup')        label = '模型載入中… 即將完成';
-      else if (lp.phase === 'starting')      label = '伺服器啟動中…';
-      text.textContent = label;
-      setTimeout(checkReady, 1500);
+// ---------- status ----------
+async function checkReady(){
+  try{
+    const d=await (await fetch(`${API}/health`)).json();
+    const dot=document.getElementById('dot'),s=document.getElementById('status');
+    if(d.sd_server_ready){
+      engine=d.engine;dot.className='dot ready';
+      s.textContent={cuda:'就緒 · CUDA',vulkan:'就緒 · Vulkan',gpu:'就緒 · GPU',cpu:'就緒 · CPU（較慢）'}[d.engine]||'就緒';
+      document.getElementById('gen-btn').disabled=false;
+    }else{
+      document.getElementById('gen-btn').disabled=true;
+      let lp={};try{lp=await (await fetch(`${API}/loadprogress`)).json();}catch{}
+      if(lp.phase==='crashed'){dot.className='dot err';s.textContent='引擎啟動失敗';showCrash(lp.error);return;}
+      dot.className='dot busy';
+      s.textContent=lp.phase==='loading'&&lp.pct?`模型載入中 ${lp.pct}%`:lp.phase==='warmup'?'即將完成':'啟動中…';
+      setTimeout(checkReady,1500);
     }
-  } catch {
-    const dot = document.getElementById('status-dot');
-    dot.className = 'error';
-    document.getElementById('status-text').textContent = '無法連線';
-    setTimeout(checkReady, 5000);
-  }
+  }catch{document.getElementById('dot').className='dot err';document.getElementById('status').textContent='無法連線';setTimeout(checkReady,4000);}
 }
+function showCrash(e){const ph=document.getElementById('ph');ph.style.display='flex';
+  ph.innerHTML=`<div style="max-width:560px;color:#e05050"><div style="font-size:15px;font-weight:600;margin-bottom:10px">⚠️ 引擎啟動失敗</div><pre style="font-size:11px;color:#888;background:#16161f;border:1px solid #2a2a3a;border-radius:8px;padding:12px;white-space:pre-wrap;max-height:300px;overflow:auto">${(e||'').replace(/</g,'&lt;')}</pre></div>`;}
 
-// ── Crash display ──────────────────────────────────────────────────────────
-function showCrash(errText) {
-  const ph = document.getElementById('preview-placeholder');
-  const hint = errText.toLowerCase().includes('vulkan') || errText.toLowerCase().includes('device')
-    ? '看起來是 GPU / Vulkan 問題：這台機器可能沒有支援 Vulkan 的顯卡或缺少顯卡驅動。'
-    : '請把下方錯誤訊息回報給開發者。';
-  ph.style.display = 'flex';
-  document.getElementById('preview-img').style.display = 'none';
-  ph.innerHTML = `
-    <div style="max-width:560px;text-align:left;color:#e05050">
-      <div style="font-size:15px;font-weight:600;margin-bottom:10px">⚠️ sd-server 啟動失敗</div>
-      <div style="font-size:12px;color:#aaa;margin-bottom:12px;line-height:1.6">${hint}</div>
-      <pre style="font-size:11px;color:#888;background:#16161f;border:1px solid #2e2e40;border-radius:8px;padding:12px;overflow:auto;max-height:280px;white-space:pre-wrap">${(errText||'(no log)').replace(/</g,'&lt;')}</pre>
-    </div>`;
+// ---------- generate ----------
+async function generate(){
+  const prompt=document.getElementById('prompt').value.trim();
+  if(!prompt){document.getElementById('prompt').focus();return;}
+  const body={prompt,negative_prompt:document.getElementById('negative').value.trim(),
+    width:W,height:H,steps:+document.getElementById('steps').value,cfg_scale:1.0,seed:+document.getElementById('seed').value};
+  setBusy(true);
+  try{
+    const r=await fetch(`${API}/generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){throw new Error((await r.json()).detail||r.statusText);}
+    const job=await r.json();curJob=job.job_id;addThumb(job);pollJob(job.job_id);
+  }catch(e){setBusy(false);alert('生成失敗：'+e.message);}
 }
+function pollJob(id){pollT=setInterval(async()=>{
+  try{const job=await (await fetch(`${API}/jobs/${id}`)).json();
+    updateProg(job);updateThumb(job);
+    if(job.status==='done'){clearInterval(pollT);showImage(job);setBusy(false);}
+    else if(job.status==='failed'){clearInterval(pollT);setBusy(false);alert('生成失敗：'+(job.error||'?'));}
+  }catch{}},1500);}
 
-// ── Generate ───────────────────────────────────────────────────────────────
-async function generate() {
-  const prompt = document.getElementById('prompt').value.trim();
-  if (!prompt) { document.getElementById('prompt').focus(); return; }
+function setBusy(b){document.getElementById('gen-btn').disabled=b;
+  const o=document.getElementById('overlay');
+  if(b){o.classList.add('show');t0=Date.now();document.getElementById('bar').style.width='0%';tickProg();}
+  else{o.classList.remove('show');clearInterval(pollT);}}
+function tickProg(){if(!document.getElementById('overlay').classList.contains('show'))return;
+  const el=(Date.now()-t0)/1000,est=estSecs();const pct=Math.min(96,el/est*100);
+  document.getElementById('bar').style.width=pct+'%';
+  const f=s=>s>=60?`${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}`:`${Math.round(s)}s`;
+  document.getElementById('ptext').textContent=`已用 ${f(el)} · 預估 ${f(est)}`;
+  setTimeout(tickProg,500);}
+function updateProg(job){if(job.status!=='running')return;}
+function estSecs(){const base=57,px=512*512;let t=base*Math.pow((W*H)/px,1.26);if(engine==='cpu')t*=6;return t;}
 
-  const [w, h] = document.getElementById('resolution').value.split(',').map(Number);
-  const steps  = parseInt(document.getElementById('steps').value);
-  const seed   = parseInt(document.getElementById('seed').value);
-  const neg    = document.getElementById('negative').value.trim();
+function showImage(job){const img=document.getElementById('preview-img');
+  img.src=`${API}/images/${job.job_id}?t=${Date.now()}`;img.style.display='block';
+  document.getElementById('ph').style.display='none';
+  document.getElementById('imgbar').classList.add('show');
+  const m=document.getElementById('imgmeta');m.style.display='block';
+  m.textContent=`${job.width}×${job.height} · seed ${job.seed} · ${job.duration_seconds}s · ${job.engine||engine}`;
+  curJob=job.job_id;curSeed=job.seed;curW=job.width;curH=job.height;curPrompt=job.prompt;curNeg=job.negative_prompt;}
+let curW,curH,curPrompt,curNeg;
 
-  setGenerating(true, w, h);
+// image actions
+function dlCurrent(){if(!curJob)return;const a=document.createElement('a');a.href=`${API}/images/${curJob}`;a.download='';a.click();}
+function reuseSeed(){if(curSeed>=0)document.getElementById('seed').value=curSeed;}
+function regen(){if(curPrompt){document.getElementById('prompt').value=curPrompt;document.getElementById('negative').value=curNeg||'';generate();}}
 
-  try {
-    const r = await fetch(`${API}/generate`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt, negative_prompt: neg, width: w, height: h, steps, cfg_scale: 1.0, seed })
-    });
-    if (!r.ok) {
-      const err = await r.json();
-      throw new Error(err.detail || r.statusText);
-    }
-    const job = await r.json();
-    currentJobId = job.job_id;
-    addHistoryItem(job);
-    pollJob(job.job_id, w, h);
-  } catch (e) {
-    setGenerating(false);
-    alert('生成失敗：' + e.message);
-  }
-}
+// ---------- history ----------
+function addThumb(job){const h=document.getElementById('history');const e=h.querySelector('.empty');if(e)e.remove();
+  const d=document.createElement('div');d.className='thumb active';d.id='t-'+job.job_id;
+  d.innerHTML=`<div class="st busy">生成中</div><button class="del" onclick="event.stopPropagation();delJob('${job.job_id}')">×</button>`;
+  d.onclick=()=>viewJob(job.job_id);
+  document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('active'));
+  h.prepend(d);}
+function updateThumb(job){const d=document.getElementById('t-'+job.job_id);if(!d)return;
+  if(job.status==='done'){d.innerHTML=`<img src="${API}/images/${job.job_id}?t=${Date.now()}"><button class="del" onclick="event.stopPropagation();delJob('${job.job_id}')">×</button>`;d.onclick=()=>viewJob(job.job_id);}
+  else if(job.status==='failed'){d.querySelector('.st').className='st fail';d.querySelector('.st').textContent='失敗';}}
+async function viewJob(id){try{const job=await (await fetch(`${API}/jobs/${id}`)).json();if(job.status==='done'){showImage(job);
+  document.querySelectorAll('.thumb').forEach(x=>x.classList.remove('active'));document.getElementById('t-'+id)?.classList.add('active');}}catch{}}
+async function delJob(id){try{await fetch(`${API}/jobs/${id}`,{method:'DELETE'});}catch{}
+  document.getElementById('t-'+id)?.remove();
+  if(curJob===id){document.getElementById('preview-img').style.display='none';document.getElementById('ph').style.display='flex';
+    document.getElementById('imgbar').classList.remove('show');document.getElementById('imgmeta').style.display='none';}
+  if(!document.querySelectorAll('.thumb').length){document.getElementById('history').innerHTML='<span class="empty">尚無生成記錄</span>';}}
 
-// ── Poll job ───────────────────────────────────────────────────────────────
-function pollJob(jobId, w, h) {
-  pollTimer = setInterval(async () => {
-    try {
-      const r = await fetch(`${API}/jobs/${jobId}`);
-      const job = await r.json();
-      updateProgress(job, w, h);
-      updateHistoryItem(job);
+// ---------- tabs / log / folder ----------
+function tab(t){document.getElementById('tab-gen').classList.toggle('active',t==='gen');
+  document.getElementById('tab-log').classList.toggle('active',t==='log');
+  document.getElementById('view-gen').style.display=t==='gen'?'flex':'none';
+  document.getElementById('view-log').style.display=t==='log'?'block':'none';
+  clearInterval(logT);if(t==='log'){refreshLog();logT=setInterval(refreshLog,2000);}}
+async function refreshLog(){try{const d=await (await fetch(`${API}/logs`)).json();
+  document.getElementById('logc').innerHTML=`<div class="logh">引擎：${d.engine||'-'}　狀態：${d.state||'-'}</div><div class="logh">應用程式記錄</div>${esc(d.app)}<div class="logh">生圖引擎記錄</div>${esc(d.sd_server)}`;}catch{}}
+function esc(s){return (s||'').replace(/</g,'&lt;')}
+async function openOut(){try{await fetch(`${API}/open_output`,{method:'POST'});}catch{}}
 
-      if (job.status === 'done') {
-        clearInterval(pollTimer);
-        showImage(jobId, job.duration_seconds);
-        setGenerating(false);
-      } else if (job.status === 'failed') {
-        clearInterval(pollTimer);
-        setGenerating(false);
-        alert('生成失敗：' + (job.error || '未知錯誤'));
-      }
-    } catch { /* network hiccup, keep polling */ }
-  }, 2000);
-}
+// ---------- model setup ----------
+async function checkModels(){try{const d=await (await fetch(`${API}/config`)).json();
+  document.getElementById('setup-dir').value=d.model_dir||'';
+  if(!d.models_ready){if(d.missing?.length)document.getElementById('setup-miss').textContent='缺少：'+d.missing.join('、');
+    document.getElementById('setup').classList.add('show');return false;}return true;}catch{return false;}}
+async function saveDir(){const dir=document.getElementById('setup-dir').value.trim();if(!dir)return;
+  const st=document.getElementById('setup-status');st.textContent='儲存中…';
+  try{const d=await (await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir})})).json();
+    if(d.models_ready){document.getElementById('setup').classList.remove('show');checkReady();}
+    else{const c=await (await fetch(`${API}/config`)).json();document.getElementById('setup-miss').textContent='缺少：'+(c.missing||[]).join('、');st.textContent='該資料夾找不到模型。';}}
+  catch(e){st.textContent='錯誤：'+e.message;}}
+async function dlModels(){const dir=document.getElementById('setup-dir').value.trim();
+  if(dir)await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir})});
+  await fetch(`${API}/download_models`,{method:'POST'});const st=document.getElementById('setup-status');
+  const tm=setInterval(async()=>{try{const d=await (await fetch(`${API}/download_status`)).json();
+    if(d.error){st.textContent='下載失敗：'+d.error;clearInterval(tm);}
+    else if(d.done){st.textContent='下載完成！啟動中…';clearInterval(tm);setTimeout(()=>{document.getElementById('setup').classList.remove('show');checkReady();},1200);}
+    else if(d.active){st.textContent=`下載中 ${d.file} … ${d.pct}%`;}}catch{}},1000);}
 
-// ── Progress ───────────────────────────────────────────────────────────────
-function setGenerating(busy, w, h) {
-  document.getElementById('gen-btn').disabled = busy;
-  const dot  = document.getElementById('status-dot');
-  const text = document.getElementById('status-text');
-  const overlay = document.getElementById('progress-overlay');
-
-  if (busy) {
-    dot.className = 'busy';
-    text.textContent = '生成中…';
-    overlay.classList.add('show');
-    genStartTime = Date.now();
-    document.getElementById('progress-bar').style.width = '0%';
-    updateProgressText(w, h);
-  } else {
-    dot.className = 'ready';
-    text.textContent = '就緒';
-    overlay.classList.remove('show');
-    clearInterval(pollTimer);
-  }
-}
-
-function updateProgress(job, w, h) {
-  if (job.status !== 'running') return;
-  const elapsed = (Date.now() - genStartTime) / 1000;
-  const estimate = estimateSecs(w, h);
-  const pct = Math.min(95, (elapsed / estimate) * 100);
-  document.getElementById('progress-bar').style.width = pct + '%';
-  updateProgressText(w, h, elapsed);
-}
-
-function updateProgressText(w, h, elapsed) {
-  const estimate = estimateSecs(w, h);
-  const left = elapsed ? Math.max(0, estimate - elapsed) : estimate;
-  const fmt = s => s >= 60 ? `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}` : `${Math.round(s)}s`;
-  document.getElementById('progress-text').textContent =
-    elapsed ? `已用 ${fmt(elapsed)} · 預估剩餘 ${fmt(left)}` : `預估約 ${fmt(estimate)}`;
-}
-
-function estimateSecs(w, h) {
-  // t ≈ 57 × (pixels / 512²)^1.26  (measured on Apple M5 GPU)
-  const base = 57, basePx = 512 * 512;
-  let t = base * Math.pow((w * h) / basePx, 1.26);
-  if (window.__engine === 'cpu') t *= 6;   // CPU is roughly 6x slower
-  return t;
-}
-
-// ── Show result ────────────────────────────────────────────────────────────
-function showImage(jobId, duration) {
-  const img = document.getElementById('preview-img');
-  const ph  = document.getElementById('preview-placeholder');
-  img.src = `${API}/images/${jobId}?t=${Date.now()}`;
-  img.style.display = 'block';
-  ph.style.display  = 'none';
-  img.onload = () => {
-    document.getElementById('progress-bar').style.width = '100%';
-  };
-  document.getElementById('status-text').textContent =
-    duration ? `完成 (${duration}s)` : '完成';
-}
-
-// ── History ────────────────────────────────────────────────────────────────
-function addHistoryItem(job) {
-  const list = document.getElementById('history-list');
-  const el = document.createElement('div');
-  el.className = 'hist-thumb pending';
-  el.id = 'hist-' + job.job_id;
-  el.innerHTML = `
-    <div class="hist-meta">${job.prompt.slice(0,30)}…</div>
-  `;
-  el.onclick = () => {
-    if (job.status === 'done') showImage(job.job_id, job.duration_seconds);
-  };
-  list.prepend(el);
-}
-
-function updateHistoryItem(job) {
-  const el = document.getElementById('hist-' + job.job_id);
-  if (!el) return;
-  el.className = 'hist-thumb ' + job.status;
-  if (job.status === 'done') {
-    el.innerHTML = `
-      <img src="${API}/images/${job.job_id}?t=${Date.now()}" loading="lazy">
-      <div class="hist-meta">${job.duration_seconds}s · ${job.width}×${job.height}</div>
-    `;
-    el.onclick = () => showImage(job.job_id, job.duration_seconds);
-  } else if (job.status === 'failed') {
-    el.innerHTML = `<div class="hist-meta">失敗</div>`;
-  }
-}
-
-// ── Prompt Enter key ───────────────────────────────────────────────────────
-document.getElementById('prompt').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); }
-});
-
-// ── Open output folder ─────────────────────────────────────────────────────
-async function openOutput() {
-  try { await fetch(`${API}/open_output`, { method: 'POST' }); } catch {}
-}
-
-// ── Tabs + log view ──────────────────────────────────────────────────────
-let logTimer = null;
-function switchTab(t) {
-  document.getElementById('tab-gen').classList.toggle('active', t === 'gen');
-  document.getElementById('tab-log').classList.toggle('active', t === 'log');
-  document.getElementById('view-gen').style.display = t === 'gen' ? 'flex' : 'none';
-  document.getElementById('view-log').style.display = t === 'log' ? 'block' : 'none';
-  clearInterval(logTimer);
-  if (t === 'log') { refreshLogs(); logTimer = setInterval(refreshLogs, 2000); }
-}
-function escHtml(s) { return (s || '').replace(/</g, '&lt;'); }
-async function refreshLogs() {
-  try {
-    const d = await (await fetch(`${API}/logs`)).json();
-    document.getElementById('log-content').innerHTML =
-      `<div class="log-section-title">引擎：${d.engine || '-'}　狀態：${d.state || '-'}</div>` +
-      `<div class="log-section-title">應用程式記錄 (app.log)</div>${escHtml(d.app) || '(空)'}` +
-      `<div class="log-section-title">生圖引擎記錄 (sd-server.log)</div>${escHtml(d.sd_server) || '(空)'}`;
-  } catch {}
-}
-
-// ── Model download ───────────────────────────────────────────────────────
-async function downloadModels() {
-  const dir = document.getElementById('setup-model-dir').value.trim();
-  if (dir) {
-    await fetch(`${API}/config`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({model_dir: dir})
-    });
-  }
-  await fetch(`${API}/download_models`, {method: 'POST'});
-  const st = document.getElementById('setup-status');
-  const timer = setInterval(async () => {
-    try {
-      const d = await (await fetch(`${API}/download_status`)).json();
-      if (d.error)      { st.textContent = '下載失敗：' + d.error; clearInterval(timer); }
-      else if (d.done)  { st.textContent = '下載完成！正在啟動引擎…'; clearInterval(timer);
-                          setTimeout(() => { document.getElementById('setup-overlay').classList.remove('show'); checkReady(); }, 1200); }
-      else if (d.active){ st.textContent = `下載中 ${d.file} … ${d.pct}%`; }
-    } catch {}
-  }, 1000);
-}
-
-// ── Model setup ────────────────────────────────────────────────────────────
-async function checkModels() {
-  try {
-    const r = await fetch(`${API}/config`);
-    const d = await r.json();
-    document.getElementById('setup-model-dir').value = d.model_dir || '';
-    if (!d.models_ready) {
-      if (d.missing && d.missing.length)
-        document.getElementById('setup-missing-list').textContent = 'Missing: ' + d.missing.join(', ');
-      document.getElementById('setup-overlay').classList.add('show');
-      return false;
-    }
-    return true;
-  } catch { return false; }
-}
-
-async function saveModelDir() {
-  const dir = document.getElementById('setup-model-dir').value.trim();
-  if (!dir) return;
-  document.getElementById('setup-status').textContent = 'Saving...';
-  try {
-    const r = await fetch(`${API}/config`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({model_dir: dir})
-    });
-    const d = await r.json();
-    if (d.models_ready) {
-      document.getElementById('setup-overlay').classList.remove('show');
-      document.getElementById('setup-status').textContent = '';
-      checkReady();
-    } else {
-      const cfg = await (await fetch(`${API}/config`)).json();
-      document.getElementById('setup-missing-list').textContent = 'Missing: ' + (cfg.missing||[]).join(', ');
-      document.getElementById('setup-status').textContent = 'Models not found in that folder.';
-    }
-  } catch(e) { document.getElementById('setup-status').textContent = 'Error: ' + e.message; }
-}
-
-// ── Init ───────────────────────────────────────────────────────────────────
-document.getElementById('gen-btn').disabled = true;
-checkModels().then(ok => { if (ok) checkReady(); });
+// init
+document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();generate();}});
+checkModels().then(ok=>{if(ok)checkReady();});
 </script>
 </body>
 </html>

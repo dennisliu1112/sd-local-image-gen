@@ -70,7 +70,7 @@ async function createWindow() {
     width: 1180, height: 820, minWidth: 900, minHeight: 640,
     backgroundColor: '#0f0f12',
     show: false,
-    title: 'Z-Image Generator',
+    title: 'Amazing image Generator',
     webPreferences: { contextIsolation: true },
   });
   win.removeMenu();

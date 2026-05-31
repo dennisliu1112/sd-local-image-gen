@@ -41,29 +41,28 @@
     <rect x="64"  y="64" width="896" height="896" fill="url(#sheen)"/>
   </g>
 
-  <!-- ===== LEFT: canvas board (line art) with the three-cloud emblem ===== -->
-  <rect x="122" y="140" width="364" height="392" rx="30"
-        fill="none" stroke="#ffffff" stroke-width="18"/>
-  <g clip-path="url(#boardClip)">
+  <!-- ===== LEFT: canvas board (line art) with emblem — frame 10% smaller ===== -->
+  <g transform="translate(304 336) scale(0.9) translate(-304 -336)">
+    <rect x="122" y="140" width="364" height="392" rx="30" fill="none" stroke="#ffffff" stroke-width="18"/>
     <use href="#trio" transform="translate(304 338) scale(1.0)"/>
   </g>
 
-  <!-- ===== RIGHT: camera (line art); lens shows the same emblem ===== -->
-  <g fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M690 150 h76 v46 h-76 z"/>
-    <rect x="540" y="196" width="364" height="300" rx="48"/>
-    <circle cx="722" cy="356" r="100"/>
-    <circle cx="722" cy="356" r="50"/>
-    <circle cx="592" cy="252" r="12" fill="#ffffff" stroke="none"/>
-  </g>
-  <g clip-path="url(#lensClip)">
-    <use href="#trio" transform="translate(722 356) scale(0.30)"/>
+  <!-- ===== RIGHT: camera (line art); lens shows the same emblem — frame 10% smaller ===== -->
+  <g transform="translate(722 340) scale(0.9) translate(-722 -340)">
+    <g fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M690 150 h76 v46 h-76 z"/>
+      <rect x="540" y="196" width="364" height="300" rx="48"/>
+      <circle cx="722" cy="356" r="100"/>
+      <circle cx="722" cy="356" r="50"/>
+      <circle cx="592" cy="252" r="12" fill="#ffffff" stroke="none"/>
+    </g>
+    <use href="#trio" transform="translate(722 356) scale(0.28)"/>
   </g>
 
-  <!-- ===== bottom: A i G — lowercase i centred on the divider ===== -->
+  <!-- ===== bottom: A i G — lowercase i, same height as the caps ===== -->
   <g fill="#ffffff" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="800">
-    <text x="476" y="880" text-anchor="end"    font-size="300">A</text>
-    <text x="512" y="880" text-anchor="middle"  font-size="190">i</text>
-    <text x="548" y="880" text-anchor="start"   font-size="300">G</text>
+    <text x="470" y="880" text-anchor="end"    font-size="300">A</text>
+    <text x="512" y="880" text-anchor="middle"  font-size="300">i</text>
+    <text x="554" y="880" text-anchor="start"   font-size="300">G</text>
   </g>
 </svg>

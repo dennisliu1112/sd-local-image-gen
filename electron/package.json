@@ -1,9 +1,9 @@
 {
-  "name": "zimage-generator",
+  "name": "amazing-image-generator",
   "version": "1.0.0",
-  "description": "Z-Image Generator — local AI image generation",
+  "description": "Amazing image Generator (AiG) — local AI image generation",
   "main": "main.js",
-  "author": "ZImageGen",
+  "author": "AiG",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -17,8 +17,8 @@
     "tree-kill": "^1.2.2"
   },
   "build": {
-    "appId": "com.finetek.zimagegen",
-    "productName": "ZImageGen",
+    "appId": "com.finetek.amazingimagegenerator",
+    "productName": "Amazing image Generator",
     "directories": { "output": "release" },
     "files": ["main.js", "package.json"],
     "extraResources": [
