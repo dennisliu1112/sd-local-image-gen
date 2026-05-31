@@ -634,7 +634,11 @@ def get_config_endpoint():
         "low_vram": bool(cfg.get("low_vram", False)),
         "models_ready": models_ready(),
         "missing": [f for f, p in files.items() if not p.exists()],
-        "models": [{"name": f, "exists": p.exists(), "url": urls.get(f, "")} for f, p in files.items()],
+        "models": [{"name": f, "exists": p.exists(), "url": urls.get(f, ""),
+                    "role": MODEL_META.get(f, {}).get("role", ""),
+                    "license": MODEL_META.get(f, {}).get("license", ""),
+                    "source": MODEL_META.get(f, {}).get("source", "")}
+                   for f, p in files.items()],
     }
 
 @app.post("/config")
@@ -699,6 +703,12 @@ DEFAULT_URLS = {
     "z_image_turbo-Q4_K.gguf": "https://huggingface.co/shuttleai/shuttle-jaguar/resolve/main/z_image_turbo-Q4_K.gguf",
     "ae.safetensors":          "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors",
     "Qwen3-4B-Q4_K_M.gguf":    "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+}
+
+MODEL_META = {
+    "z_image_turbo-Q4_K.gguf": {"role": "擴散模型（畫師）", "license": "Apache 2.0", "source": "Tongyi-MAI/Z-Image-Turbo"},
+    "ae.safetensors":          {"role": "VAE（解碼成圖）",  "license": "Apache 2.0", "source": "black-forest-labs/FLUX.1-schnell"},
+    "Qwen3-4B-Q4_K_M.gguf":    {"role": "文字編碼（翻譯）", "license": "Apache 2.0", "source": "Qwen/Qwen3-4B"},
 }
 
 def get_model_urls() -> dict:

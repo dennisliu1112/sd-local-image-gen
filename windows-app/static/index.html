@@ -84,6 +84,12 @@
   .tagedit .phr{flex:1}
   .save-btn{align-self:flex-start;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:11px 26px;font-size:14px;font-weight:700;cursor:pointer}
   .save-btn:hover{filter:brightness(1.08)}
+  .dlbtn{transition:.2s}
+  .dlbtn.dim{background:var(--panel2);color:var(--muted);box-shadow:none}
+  .dlbtn.lit{background:linear-gradient(135deg,#9b7bff,#6a3df0);box-shadow:0 0 0 0 rgba(124,92,252,.6);animation:glow 1.6s infinite}
+  @keyframes glow{0%{box-shadow:0 0 0 0 rgba(124,92,252,.5)}70%{box-shadow:0 0 0 12px rgba(124,92,252,0)}100%{box-shadow:0 0 0 0 rgba(124,92,252,0)}}
+  .mrole{font-size:10.5px;color:var(--faint)}
+  .mlic{font-size:10.5px;color:#4caf80}
   .saved{font-size:12px;color:#4caf80;margin-left:12px}
 
   #setup{display:none;position:fixed;inset:0;z-index:100;background:rgba(10,10,16,.96);align-items:center;justify-content:center}
@@ -202,7 +208,8 @@
       <h3>模型</h3>
       <div class="setrow"><label>模型資料夾</label><input type="text" id="modeldir" style="flex:1" placeholder="例如 D:\AiG\models"><button class="mini" onclick="saveModels()">儲存</button></div>
       <div id="modellist" style="margin-top:10px"></div>
-      <button class="save-btn" onclick="downloadFromSettings()" style="margin-top:10px">下載缺少的模型</button><span class="saved" id="dlmsg"></span>
+      <button class="save-btn dlbtn dim" id="dlbtn" onclick="downloadFromSettings()" style="margin-top:10px">下載缺少的模型</button><span class="saved" id="dlmsg"></span>
+      <div style="font-size:11px;color:var(--faint);margin-top:8px">全部為 Apache 2.0 授權，可自由商用（需保留授權聲明）。</div>
       <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.7">
         <b style="color:var(--txt)">關於模型量化（Z-Image Turbo）</b><br>
         目前內建 <b style="color:var(--accent2)">Q4_K</b> ── 已是 4GB 顯卡的最佳平衡（速度 / 品質 / 顯存），不需更換。<br>
@@ -382,10 +389,18 @@ async function loadConfig(){try{const d=await (await fetch(`${API}/config`)).jso
   document.getElementById('outdir').value=d.output_dir||'';
   renderModels(d.models||[]);}catch{}}
 function renderModels(models){const box=document.getElementById('modellist');box.innerHTML='';
-  models.forEach(mm=>{const row=document.createElement('div');row.className='tagedit';
-    row.innerHTML=`<span style="width:150px;flex-shrink:0;font-size:12px;color:${mm.exists?'#4caf80':'#e05050'}">${mm.exists?'✓':'✗'} ${mm.name}</span>
+  let missing=0;
+  models.forEach(mm=>{if(!mm.exists)missing++;const row=document.createElement('div');row.className='tagedit';row.style.alignItems='flex-start';
+    row.innerHTML=`<div style="width:190px;flex-shrink:0">
+        <div style="font-size:12px;color:${mm.exists?'#4caf80':'#e05050'}">${mm.exists?'✓ 已就緒':'✗ 缺少'} ${mm.name}</div>
+        <div class="mrole">${mm.role||''}</div>
+        <div class="mlic">授權：${mm.license||'?'}　來源：${mm.source||''}</div>
+      </div>
       <input class="phr murl" data-name="${mm.name}" type="text" value="${(mm.url||'').replace(/"/g,'&quot;')}" placeholder="下載連結">`;
-    box.appendChild(row);});}
+    box.appendChild(row);});
+  const btn=document.getElementById('dlbtn');
+  if(btn){btn.classList.toggle('lit',missing>0);btn.classList.toggle('dim',missing===0);
+    btn.textContent=missing>0?`下載缺少的模型（${missing}）`:'模型已就緒';}}
 async function saveModels(){const dir=document.getElementById('modeldir').value.trim();
   const urls={};document.querySelectorAll('.murl').forEach(i=>{urls[i.dataset.name]=i.value.trim();});
   try{await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir,model_urls:urls})});loadConfig();checkReady();}catch(e){alert('儲存失敗：'+e.message);}}
