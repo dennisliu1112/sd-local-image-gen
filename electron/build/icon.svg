@@ -20,16 +20,16 @@
     <!-- three-cloud emblem: 3 petals at 120°, cloud-arc dividers -->
     <g id="trio">
       <g fill="#ff4d4d">
-        <path d="M 0 0 C -31 -38 -62 -64 -76 -92 C -94 -122 -44 -136 0 -84
-                 C 44 -136 94 -122 76 -92 C 62 -64 31 -38 0 0 Z"/>
+        <path d="M 0 0 C -36 -32 -76 -54 -94 -82 C -116 -114 -54 -134 0 -102
+                 C 54 -134 116 -114 94 -82 C 76 -54 36 -32 0 0 Z"/>
       </g>
       <g fill="#ffd23d" transform="rotate(120)">
-        <path d="M 0 0 C -31 -38 -62 -64 -76 -92 C -94 -122 -44 -136 0 -84
-                 C 44 -136 94 -122 76 -92 C 62 -64 31 -38 0 0 Z"/>
+        <path d="M 0 0 C -36 -32 -76 -54 -94 -82 C -116 -114 -54 -134 0 -102
+                 C 54 -134 116 -114 94 -82 C 76 -54 36 -32 0 0 Z"/>
       </g>
       <g fill="#2f6bf0" transform="rotate(240)">
-        <path d="M 0 0 C -31 -38 -62 -64 -76 -92 C -94 -122 -44 -136 0 -84
-                 C 44 -136 94 -122 76 -92 C 62 -64 31 -38 0 0 Z"/>
+        <path d="M 0 0 C -36 -32 -76 -54 -94 -82 C -116 -114 -54 -134 0 -102
+                 C 54 -134 116 -114 94 -82 C 76 -54 36 -32 0 0 Z"/>
       </g>
     </g>
   </defs>
@@ -45,7 +45,7 @@
   <rect x="122" y="140" width="364" height="392" rx="30"
         fill="none" stroke="#ffffff" stroke-width="18"/>
   <g clip-path="url(#boardClip)">
-    <use href="#trio" transform="translate(304 338) scale(1.18)"/>
+    <use href="#trio" transform="translate(304 338) scale(1.0)"/>
   </g>
 
   <!-- ===== RIGHT: camera (line art); lens shows the same emblem ===== -->
@@ -57,7 +57,7 @@
     <circle cx="592" cy="252" r="12" fill="#ffffff" stroke="none"/>
   </g>
   <g clip-path="url(#lensClip)">
-    <use href="#trio" transform="translate(722 356) scale(0.38)"/>
+    <use href="#trio" transform="translate(722 356) scale(0.30)"/>
   </g>
 
   <!-- ===== bottom: A i G — lowercase i centred on the divider ===== -->
