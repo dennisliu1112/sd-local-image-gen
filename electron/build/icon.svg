@@ -53,16 +53,20 @@
     </g>
   </g>
 
-  <!-- ===== ART SIDE: large art board with 3-colour rainbow (lower-right) ===== -->
-  <!-- board same size as the lens (~420) -->
+  <!-- ===== ART SIDE: art board with 3-colour rainbow (lower-right), scaled to 75% ===== -->
+  <g transform="translate(680 700) scale(0.75) translate(-680 -700)">
   <g filter="url(#soft)" transform="rotate(-6 652 652)">
     <rect x="442" y="442" width="420" height="420" rx="48" fill="#f5f4fc"/>
     <rect x="442" y="442" width="420" height="420" rx="48" fill="none" stroke="#d9d7ec" stroke-width="6"/>
-    <!-- three-colour rainbow (concentric arcs) -->
-    <g fill="none" stroke-linecap="round" stroke-width="40">
-      <path d="M 506 788 A 146 146 0 0 1 798 788" stroke="#ff5d6c"/>
-      <path d="M 558 788 A 94 94 0 0 1 746 788"   stroke="#ffc233"/>
-      <path d="M 610 788 A 42 42 0 0 1 694 788"   stroke="#36c5f0"/>
+    <!-- seven-colour rainbow (concentric arcs) -->
+    <g fill="none" stroke-linecap="round" stroke-width="17">
+      <path d="M 502 788 A 150 150 0 0 1 802 788" stroke="#ff4d4d"/>
+      <path d="M 520 788 A 132 132 0 0 1 784 788" stroke="#ff9a3d"/>
+      <path d="M 538 788 A 114 114 0 0 1 766 788" stroke="#ffd23d"/>
+      <path d="M 556 788 A 96 96 0 0 1 748 788"   stroke="#3ddc84"/>
+      <path d="M 574 788 A 78 78 0 0 1 730 788"   stroke="#36a5f0"/>
+      <path d="M 592 788 A 60 60 0 0 1 712 788"   stroke="#5b6cf0"/>
+      <path d="M 610 788 A 42 42 0 0 1 694 788"   stroke="#a05cf0"/>
     </g>
   </g>
 
@@ -75,4 +79,6 @@
     <path d="M 714 792 L 642 814 L 714 836 Z" fill="#ff5d6c"/>
     <path d="M 680 803 L 642 814 L 680 825 Z" fill="#d8324a"/>
   </g>
+
+  </g><!-- /foreground scale -->
 </svg>
