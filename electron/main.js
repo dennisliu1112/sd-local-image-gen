@@ -56,22 +56,20 @@ function startBackend() {
   });
 }
 
-// --- Wait until the server answers /health --------------------------------
-function waitForHealth(timeoutMs = 180000, interval = 500) {
-  const deadline = Date.now() + timeoutMs;
-  return new Promise((resolve, reject) => {
+// Poll /health forever WHILE the backend process is alive. Resolve true on
+// the first 200; resolve false only if the backend process has exited (crash).
+// No hard time limit — first run legitimately takes a while (downloads).
+function waitForHealthOrExit(interval = 500) {
+  return new Promise((resolve) => {
     const ping = () => {
+      if (backend === null) return resolve(false);   // backend exited → real failure
       const req = http.get(`${BASE}/health`, (res) => {
         res.resume();
-        if (res.statusCode === 200) resolve();
-        else retry();
+        if (res.statusCode === 200) resolve(true);
+        else setTimeout(ping, interval);
       });
-      req.on('error', retry);
-      req.setTimeout(2000, () => req.destroy());
-    };
-    const retry = () => {
-      if (Date.now() > deadline) return reject(new Error('backend did not start in time'));
-      setTimeout(ping, interval);
+      req.on('error', () => setTimeout(ping, interval));
+      req.setTimeout(2000, function () { this.destroy(); });
     };
     ping();
   });
@@ -97,22 +95,32 @@ async function createWindow() {
     webPreferences: { contextIsolation: true, preload: path.join(__dirname, 'preload.js') },
   });
 
-  try {
-    await win.webContents.session.clearCache();          // never show a stale cached UI
-    await waitForHealth();
+  // Show a "starting" screen immediately, then swap to the app once the
+  // server is up. First run downloads engines/models, so this can take a while.
+  const loading =
+    `<!doctype html><meta charset="utf-8">
+     <body style="margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#0f0f12;color:#e9e9f1;font-family:-apple-system,'Microsoft JhengHei',sans-serif">
+     <div style="font-size:18px;font-weight:700;color:#9b7bff">Amazing image Generator</div>
+     <div style="font-size:14px;color:#8b8ba0">啟動中… 請稍候</div>
+     <div style="font-size:12px;color:#5a5a70;max-width:420px;text-align:center;line-height:1.6">首次啟動會自動下載引擎與模型，可能需要數分鐘到數十分鐘（依網速與模型大小）。</div>
+     </body>`;
+  await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(loading));
+  win.show();
+
+  await win.webContents.session.clearCache();            // never show a stale cached UI
+  const ok = await waitForHealthOrExit();
+  if (ok) {
     await win.loadURL(`${BASE}/?v=${Date.now()}`);        // cache-bust the page load
-  } catch (e) {
+  } else {
     const html =
       `<!doctype html><meta charset="utf-8">
        <body style="background:#0f0f12;color:#e9e9f1;font-family:-apple-system,'Microsoft JhengHei',sans-serif;padding:36px">
-       <h2 style="color:#e05050">無法啟動生圖伺服器</h2>
-       <p>${String(e)}${backendExit !== null ? `（後端已結束，代碼 ${backendExit}）` : ''}</p>
-       <p style="color:#8b8ba0;font-size:13px">後端輸出（供除錯）：</p>
-       <pre style="background:#16161f;border:1px solid #2a2a3a;border-radius:8px;padding:14px;white-space:pre-wrap;font-size:11px;max-height:60vh;overflow:auto">${backendLog.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre>
+       <h2 style="color:#e05050">生圖伺服器啟動失敗</h2>
+       <p>後端程序已結束${backendExit !== null ? `（代碼 ${backendExit}）` : ''}。下方是後端輸出，請回報給開發者：</p>
+       <pre style="background:#16161f;border:1px solid #2a2a3a;border-radius:8px;padding:14px;white-space:pre-wrap;font-size:11px;max-height:62vh;overflow:auto">${backendLog.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre>
        </body>`;
     await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
   }
-  win.show();
 }
 
 // --- Lifecycle: kill the whole backend tree on quit -----------------------
