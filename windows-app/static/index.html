@@ -282,6 +282,7 @@
   <h1>Z-Image Generator</h1>
   <span id="status-text">連線中…</span>
   <div style="margin-left:auto; display:flex; gap:6px">
+    <button class="tab-btn" id="open-folder" onclick="openOutput()" title="開啟出圖資料夾">📂 出圖資料夾</button>
     <button class="tab-btn active" id="tab-gen" onclick="switchTab('gen')">生成</button>
     <button class="tab-btn" id="tab-log" onclick="switchTab('log')">記錄</button>
   </div>
@@ -563,6 +564,11 @@ function updateHistoryItem(job) {
 document.getElementById('prompt').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); }
 });
+
+// ── Open output folder ─────────────────────────────────────────────────────
+async function openOutput() {
+  try { await fetch(`${API}/open_output`, { method: 'POST' }); } catch {}
+}
 
 // ── Tabs + log view ──────────────────────────────────────────────────────
 let logTimer = null;

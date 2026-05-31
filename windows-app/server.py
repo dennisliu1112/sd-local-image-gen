@@ -46,12 +46,14 @@ else:
 
 ROOT       = APP_DIR
 EXE_NAME   = "sd-server.exe" if os.name == "nt" else "sd-server"
-OUTPUT_DIR = ROOT / "output"
+# Generated images go to the user's Pictures folder (cross-platform), not
+# inside the app bundle — easy to find and survives app updates.
+OUTPUT_DIR = Path.home() / "Pictures" / "ZImageGen"
 LOG_DIR    = ROOT / "logs"
 STATIC_DIR = BUNDLE_DIR / "static"
 CONFIG_FILE = ROOT / "config.json"
 
-OUTPUT_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
 
 # Engine candidates, tried in order: fastest GPU first, then CPU fallback.
@@ -311,6 +313,19 @@ def sd_alive() -> bool:
         return False
 
 
+def _make_filename(prompt: str, job_id: str) -> str:
+    """YYYYMMDD_HHMMSS_<prompt-slug>.png — sortable and recognisable.
+    Keeps CJK/letters/digits; replaces filesystem-unsafe chars; falls back
+    to a short id to avoid same-second collisions."""
+    import re
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    slug = re.sub(r'[\\/:*?"<>|\s]+', "-", (prompt or "").strip())[:40].strip("-")
+    name = f"{ts}_{slug}" if slug else ts
+    if (OUTPUT_DIR / f"{name}.png").exists():
+        name = f"{name}_{job_id[:6]}"
+    return f"{name}.png"
+
+
 # ---------------------------------------------------------------------------
 # Worker thread
 # ---------------------------------------------------------------------------
@@ -330,7 +345,7 @@ def worker():
         job["started_at"] = datetime.now().isoformat()
         log.info("[%s] start: %s…", job_id[:8], job["prompt"][:60])
 
-        out_path = OUTPUT_DIR / f"{job_id}.png"
+        out_path = OUTPUT_DIR / _make_filename(job["prompt"], job_id)
         t0 = time.monotonic()
 
         payload = {
@@ -657,6 +672,26 @@ def download_models():
 @app.get("/download_status")
 def download_status():
     return download_state
+
+
+@app.get("/output_dir")
+def output_dir():
+    return {"path": str(OUTPUT_DIR)}
+
+
+@app.post("/open_output")
+def open_output():
+    try:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        if sys.platform == "darwin":
+            subprocess.run(["open", str(OUTPUT_DIR)])
+        elif os.name == "nt":
+            os.startfile(str(OUTPUT_DIR))   # type: ignore[attr-defined]
+        else:
+            subprocess.run(["xdg-open", str(OUTPUT_DIR)])
+        return {"ok": True, "path": str(OUTPUT_DIR)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 @app.get("/")
