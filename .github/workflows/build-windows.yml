@@ -1,12 +1,9 @@
 name: Build Windows App (Electron)
 
+# Manual only — each run produces a ~1 GB artifact, so don't build on every
+# push. Trigger from the Actions tab ("Run workflow") when you want a new
+# Windows build.
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'windows-app/**'
-      - 'electron/**'
-      - '.github/workflows/build-windows.yml'
   workflow_dispatch:
 
 jobs:
@@ -109,4 +106,4 @@ jobs:
         with:
           name: AmazingImageGenerator-Windows-${{ steps.sd_release.outputs.tag }}
           path: out/*.zip
-          retention-days: 30
+          retention-days: 7
