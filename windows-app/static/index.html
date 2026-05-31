@@ -90,6 +90,7 @@
   @keyframes glow{0%{box-shadow:0 0 0 0 rgba(124,92,252,.5)}70%{box-shadow:0 0 0 12px rgba(124,92,252,0)}100%{box-shadow:0 0 0 0 rgba(124,92,252,0)}}
   .mrole{font-size:10.5px;color:var(--faint)}
   .mlic{font-size:10.5px;color:#4caf80}
+  .mini.needdl{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
   .saved{font-size:12px;color:#4caf80;margin-left:12px}
 
   #setup{display:none;position:fixed;inset:0;z-index:100;background:rgba(10,10,16,.96);align-items:center;justify-content:center}
@@ -181,7 +182,7 @@
       <div class="setrow"><label>步數 Steps</label><input type="range" id="steps" min="1" max="20" value="4" oninput="stepsv.textContent=this.value"><span id="stepsv" style="width:28px;text-align:right">4</span></div>
       <div class="setrow"><label>種子 Seed</label><input type="number" id="seed" value="-1" min="-1" style="width:200px"><button class="mini" onclick="seed.value=Math.floor(Math.random()*4294967295)">🎲 隨機</button><span style="font-size:11px;color:var(--faint)">-1 為每次隨機</span></div>
       <div class="setrow"><label>一次張數</label><input type="number" id="count" value="1" min="1" max="8" style="width:90px"><span style="font-size:11px;color:var(--faint)">一次生成幾張（依序產生）</span></div>
-      <div class="setrow"><label>輸出格式</label><select id="fmt" style="width:140px"><option value="png">PNG（無損）</option><option value="jpg">JPG（省空間）</option></select></div>
+      <div class="setrow"><label>輸出格式</label><select id="fmt" style="width:200px"><option value="jpg" selected>JPG 99%（省空間，建議）</option><option value="png">PNG（無損，檔案大）</option></select></div>
       <button class="save-btn" onclick="saveGen()">儲存參數</button><span class="saved" id="gensaved"></span>
     </div>
     <div class="setsec">
@@ -206,10 +207,9 @@
     </div>
     <div class="setsec">
       <h3>模型</h3>
-      <div class="setrow"><label>模型資料夾</label><input type="text" id="modeldir" style="flex:1" placeholder="例如 D:\AiG\models"><button class="mini" onclick="saveModels()">儲存</button></div>
+      <div class="setrow"><label>模型資料夾</label><input type="text" id="modeldir" style="flex:1" placeholder="例如 D:\AiG\models"><button class="mini" onclick="browseInto('modeldir')">瀏覽…</button><button class="mini" onclick="saveModels()">儲存</button></div>
       <div id="modellist" style="margin-top:10px"></div>
-      <button class="save-btn dlbtn dim" id="dlbtn" onclick="downloadFromSettings()" style="margin-top:10px">下載缺少的模型</button><span class="saved" id="dlmsg"></span>
-      <div style="font-size:11px;color:var(--faint);margin-top:8px">全部為 Apache 2.0 授權，可自由商用（需保留授權聲明）。</div>
+      <div style="font-size:11px;color:var(--faint);margin-top:8px">全部為 Apache 2.0 授權，可自由商用（需保留授權聲明）。每個模型可單獨下載。</div>
       <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.7">
         <b style="color:var(--txt)">關於模型量化（Z-Image Turbo）</b><br>
         目前內建 <b style="color:var(--accent2)">Q4_K</b> ── 已是 4GB 顯卡的最佳平衡（速度 / 品質 / 顯存），不需更換。<br>
@@ -223,6 +223,7 @@
       <h3>生成資料夾（圖片儲存位置）</h3>
       <div class="setrow">
         <input type="text" id="outdir" style="flex:1" placeholder="例如 D:\AiG\output">
+        <button class="mini" onclick="browseInto('outdir')">瀏覽…</button>
         <button class="mini" onclick="saveOutdir()">儲存</button>
         <button class="mini" onclick="openOut()">開啟</button>
       </div>
@@ -247,22 +248,27 @@ let TAGS=loadTags();
 function loadTags(){try{const s=JSON.parse(localStorage.getItem('aig_tags'));
   if(Array.isArray(s)&&s.length===3)return TAG_DEFAULTS.map((d,i)=>({...d,label:s[i].label,phrase:s[i].phrase,active:false}));}catch{}
   return TAG_DEFAULTS.map(d=>({...d,active:false}));}
-function renderTags(){
+// Main-page chips only — safe to rebuild any time.
+function renderTagRow(){
   const row=document.getElementById('tagrow');row.innerHTML='';
   TAGS.forEach(t=>{const b=document.createElement('button');b.className='tag'+(t.active?' on':'');
-    b.textContent=t.label;b.style.borderColor=t.color;b.style.color=t.active?'#fff':t.color;
+    b.textContent=t.label||'(未命名)';b.style.borderColor=t.color;b.style.color=t.active?'#fff':t.color;
     b.style.background=t.active?t.color:'transparent';
-    b.onclick=()=>{t.active=!t.active;renderTags();updateFull();};row.appendChild(b);});
-  // editors in settings
+    b.onclick=()=>{t.active=!t.active;renderTagRow();updateFull();};row.appendChild(b);});
+}
+// Settings editors — built ONCE; typing must NOT rebuild them (keeps focus + IME).
+function renderTagEdit(){
   const ed=document.getElementById('tagedit');ed.innerHTML='';
   TAGS.forEach(t=>{const d=document.createElement('div');d.className='tagedit';
     d.innerHTML=`<span class="tagdot" style="background:${t.color}"></span>
       <input class="lbl" type="text" value="${t.label.replace(/"/g,'&quot;')}" placeholder="標籤名">
       <input class="phr" type="text" value="${t.phrase.replace(/"/g,'&quot;')}" placeholder="此標籤的提示詞">`;
     const[lbl,phr]=d.querySelectorAll('input');
-    lbl.oninput=()=>{t.label=lbl.value;renderTags();};phr.oninput=()=>{t.phrase=phr.value;updateFull();};
+    lbl.oninput=()=>{t.label=lbl.value;renderTagRow();};   // update chips, not the editor
+    phr.oninput=()=>{t.phrase=phr.value;updateFull();};
     ed.appendChild(d);});
 }
+function renderTags(){renderTagRow();renderTagEdit();}
 function saveTags(){localStorage.setItem('aig_tags',JSON.stringify(TAGS.map(t=>({label:t.label,phrase:t.phrase}))));
   const m=document.getElementById('savedmsg');m.textContent='已儲存 ✓';setTimeout(()=>m.textContent='',2000);}
 function fullPrompt(){const parts=[];
@@ -389,18 +395,32 @@ async function loadConfig(){try{const d=await (await fetch(`${API}/config`)).jso
   document.getElementById('outdir').value=d.output_dir||'';
   renderModels(d.models||[]);}catch{}}
 function renderModels(models){const box=document.getElementById('modellist');box.innerHTML='';
-  let missing=0;
-  models.forEach(mm=>{if(!mm.exists)missing++;const row=document.createElement('div');row.className='tagedit';row.style.alignItems='flex-start';
+  models.forEach(mm=>{const row=document.createElement('div');row.className='tagedit';row.style.alignItems='flex-start';
     row.innerHTML=`<div style="width:190px;flex-shrink:0">
         <div style="font-size:12px;color:${mm.exists?'#4caf80':'#e05050'}">${mm.exists?'✓ 已就緒':'✗ 缺少'} ${mm.name}</div>
         <div class="mrole">${mm.role||''}</div>
         <div class="mlic">授權：${mm.license||'?'}　來源：${mm.source||''}</div>
       </div>
-      <input class="phr murl" data-name="${mm.name}" type="text" value="${(mm.url||'').replace(/"/g,'&quot;')}" placeholder="下載連結">`;
+      <input class="phr murl" data-name="${mm.name}" type="text" value="${(mm.url||'').replace(/"/g,'&quot;')}" placeholder="下載連結">
+      <button class="mini mdl ${mm.exists?'':'needdl'}" data-name="${mm.name}">${mm.exists?'重新下載':'下載'}</button>`;
     box.appendChild(row);});
-  const btn=document.getElementById('dlbtn');
-  if(btn){btn.classList.toggle('lit',missing>0);btn.classList.toggle('dim',missing===0);
-    btn.textContent=missing>0?`下載缺少的模型（${missing}）`:'模型已就緒';}}
+  box.querySelectorAll('.mdl').forEach(b=>b.onclick=()=>downloadOne(b.dataset.name,b));}
+
+async function persistModels(){const dir=document.getElementById('modeldir').value.trim();
+  const urls={};document.querySelectorAll('.murl').forEach(i=>{urls[i.dataset.name]=i.value.trim();});
+  await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir,model_urls:urls})});}
+async function downloadOne(name,btn){await persistModels();
+  btn.disabled=true;btn.textContent='下載中…';
+  await fetch(`${API}/download_models`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:name})});
+  const tm=setInterval(async()=>{try{const d=await (await fetch(`${API}/download_status`)).json();
+    if(d.error){btn.disabled=false;btn.textContent='下載';clearInterval(tm);alert('下載失敗：'+d.error);}
+    else if(d.done){clearInterval(tm);loadConfig();checkReady();}
+    else if(d.active){btn.textContent=`${d.pct}%`;}}catch{}},1000);}
+async function browseInto(id){
+  if(!(window.aig&&window.aig.pickFolder)){alert('此環境不支援選取，請直接輸入或貼上路徑。');return;}
+  const p=await window.aig.pickFolder();if(!p)return;
+  document.getElementById(id).value=p;
+  if(id==='modeldir'){await saveModels();}else{await saveOutdir();}}
 async function saveModels(){const dir=document.getElementById('modeldir').value.trim();
   const urls={};document.querySelectorAll('.murl').forEach(i=>{urls[i.dataset.name]=i.value.trim();});
   try{await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_dir:dir,model_urls:urls})});loadConfig();checkReady();}catch(e){alert('儲存失敗：'+e.message);}}
@@ -408,10 +428,6 @@ async function applyEngine(){const device=document.getElementById('device').valu
   const m=document.getElementById('engsaved');m.textContent='重啟引擎中…';
   try{await fetch(`${API}/set_engine`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device,low_vram})});
     setTimeout(()=>{m.textContent='已套用 ✓';checkReady();},800);setTimeout(()=>m.textContent='',3000);}catch(e){m.textContent='失敗：'+e.message;}}
-async function downloadFromSettings(){await saveModels();await fetch(`${API}/download_models`,{method:'POST'});
-  const m=document.getElementById('dlmsg');const tm=setInterval(async()=>{try{const d=await (await fetch(`${API}/download_status`)).json();
-    if(d.error){m.textContent='下載失敗：'+d.error;clearInterval(tm);}else if(d.done){m.textContent='下載完成 ✓';clearInterval(tm);loadConfig();checkReady();setTimeout(()=>m.textContent='',3000);}else if(d.active){m.textContent=`下載中 ${d.file} … ${d.pct}%`;}}catch{}},1000);}
-
 // init
 document.getElementById('prompt').addEventListener('input',updateFull);
 document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();generate();}});

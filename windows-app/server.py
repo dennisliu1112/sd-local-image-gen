@@ -413,7 +413,7 @@ def worker():
                 try:
                     import io
                     from PIL import Image
-                    Image.open(io.BytesIO(raw)).convert("RGB").save(str(out_path), "JPEG", quality=92)
+                    Image.open(io.BytesIO(raw)).convert("RGB").save(str(out_path), "JPEG", quality=99, optimize=True)
                 except Exception as e:
                     log.warning("JPG convert failed (%s), saving PNG", e)
                     out_path = out_path.with_suffix(".png")
@@ -499,7 +499,7 @@ class GenerateRequest(BaseModel):
     steps:           int  = Field(4, ge=1, le=50)
     cfg_scale:       float = Field(1.0, ge=0.1, le=20.0)
     seed:            int  = Field(-1)
-    format:          str  = Field("png")
+    format:          str  = Field("jpg")
 
 
 @app.post("/generate")
@@ -718,16 +718,19 @@ def get_model_urls() -> dict:
     return urls
 
 
-def _download_thread(dest: Path):
+def _download_thread(dest: Path, only: Optional[str] = None):
     import urllib.request
     urls = get_model_urls()
     download_state.update(active=True, done=False, error="", pct=0, file="")
     try:
         dest.mkdir(parents=True, exist_ok=True)
-        for fname in MODEL_FILES:
+        targets = [only] if only else MODEL_FILES
+        for fname in targets:
             url = urls.get(fname)
             out = dest / fname
-            if out.exists() and out.stat().st_size > 0:
+            # skip existing only in "download all missing" mode; a single-file
+            # request always (re)downloads so a user can swap models.
+            if not only and out.exists() and out.stat().st_size > 0:
                 continue
             if not url:
                 continue
@@ -750,12 +753,16 @@ def _download_thread(dest: Path):
         log.error("Model download failed: %s", e)
 
 
+class DownloadRequest(BaseModel):
+    file: Optional[str] = None
+
 @app.post("/download_models")
-def download_models():
+def download_models(req: DownloadRequest = DownloadRequest()):
     if download_state["active"]:
         return {"active": True}
-    threading.Thread(target=_download_thread, args=(get_model_dir(),), daemon=True).start()
-    return {"active": True}
+    only = req.file if (req and req.file in MODEL_FILES) else None
+    threading.Thread(target=_download_thread, args=(get_model_dir(), only), daemon=True).start()
+    return {"active": True, "file": only}
 
 
 @app.get("/download_status")

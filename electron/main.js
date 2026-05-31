@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
@@ -82,7 +82,7 @@ async function createWindow() {
     show: false,
     autoHideMenuBar: true,           // hide menu bar on Windows; shortcuts still work
     title: 'Amazing image Generator',
-    webPreferences: { contextIsolation: true },
+    webPreferences: { contextIsolation: true, preload: path.join(__dirname, 'preload.js') },
   });
 
   try {
@@ -101,6 +101,11 @@ function stopBackend(done) {
   if (!backend) return done();
   kill(backend.pid, 'SIGTERM', () => { backend = null; done(); });
 }
+
+ipcMain.handle('pick-folder', async () => {
+  const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
+  return (r.canceled || !r.filePaths.length) ? null : r.filePaths[0];
+});
 
 app.whenReady().then(() => {
   installMenu();

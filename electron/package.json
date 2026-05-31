@@ -20,7 +20,7 @@
     "appId": "com.finetek.amazingimagegenerator",
     "productName": "Amazing image Generator",
     "directories": { "output": "release" },
-    "files": ["main.js", "package.json"],
+    "files": ["main.js", "preload.js", "package.json"],
     "extraResources": [
       { "from": "../server_dist/server", "to": "server", "filter": ["**/*"] }
     ],
