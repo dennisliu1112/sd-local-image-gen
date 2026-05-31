@@ -77,7 +77,7 @@ function installMenu() {
 
 async function createWindow() {
   win = new BrowserWindow({
-    width: 1180, height: 744, minWidth: 900, minHeight: 640,
+    width: 1024, height: 768, minWidth: 880, minHeight: 620,
     backgroundColor: '#0f0f12',
     show: false,
     autoHideMenuBar: true,           // hide menu bar on Windows; shortcuts still work
