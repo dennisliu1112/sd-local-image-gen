@@ -14,6 +14,15 @@
       <stop offset="0.4" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
     <clipPath id="round"><rect x="64" y="64" width="896" height="896" rx="208"/></clipPath>
+    <clipPath id="boardClip"><rect x="132" y="150" width="344" height="372" rx="22"/></clipPath>
+    <g id="cloud">
+      <path d="M -86 30 C -120 30 -120 -16 -86 -18 C -90 -60 -28 -70 -6 -44
+               C 6 -74 64 -70 70 -34 C 104 -36 104 30 70 30 Z"/>
+    </g>
+    <!-- cloud silhouettes for computing colour overlaps (Venn) -->
+    <clipPath id="cA"><use href="#cloud" transform="translate(278 312) scale(1.0)"/></clipPath>
+    <clipPath id="cB"><use href="#cloud" transform="translate(330 310) scale(1.0)"/></clipPath>
+    <clipPath id="cC"><use href="#cloud" transform="translate(304 360) scale(1.0)"/></clipPath>
   </defs>
 
   <!-- background: left / right blue-purple split + Apple rounded corners -->
@@ -23,39 +32,38 @@
     <rect x="64"  y="64" width="896" height="896" fill="url(#sheen)"/>
   </g>
 
-  <!-- ===== LEFT: easel (line art) ===== -->
-  <g fill="none" stroke="#ffffff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
-    <!-- canvas board -->
-    <rect x="180" y="214" width="248" height="196" rx="16"/>
-    <!-- legs + back support + cross rail -->
-    <path d="M242 410 L198 642"/>
-    <path d="M366 410 L410 642"/>
-    <path d="M304 410 L304 612"/>
-    <path d="M226 300 L304 612"/>  <!-- back leg -->
-    <path d="M220 520 L388 520"/>  <!-- cross rail -->
-  </g>
-  <!-- three-primary-colour cloud blobs on the board -->
-  <g>
-    <g fill="#ff4d4d"><circle cx="236" cy="312" r="17"/><circle cx="266" cy="312" r="17"/><circle cx="251" cy="296" r="22"/><circle cx="251" cy="320" r="15"/></g>
-    <g fill="#ffd23d"><circle cx="316" cy="300" r="15"/><circle cx="342" cy="300" r="15"/><circle cx="329" cy="286" r="20"/><circle cx="329" cy="312" r="13"/></g>
-    <g fill="#3a6ff0"><circle cx="284" cy="356" r="16"/><circle cx="312" cy="356" r="16"/><circle cx="298" cy="342" r="21"/><circle cx="298" cy="368" r="14"/></g>
-  </g>
-
-  <!-- ===== RIGHT: camera (line art) ===== -->
-  <g fill="none" stroke="#ffffff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
-    <!-- viewfinder hump -->
-    <path d="M676 286 h84 v34 h-84 z"/>
-    <!-- body -->
-    <rect x="600" y="320" width="272" height="200" rx="34"/>
-    <!-- lens -->
-    <circle cx="736" cy="424" r="68"/>
-    <circle cx="736" cy="424" r="34"/>
-    <!-- flash dot -->
-    <circle cx="640" cy="362" r="9" fill="#ffffff" stroke="none"/>
+  <!-- ===== LEFT: canvas board (line art), enlarged toward the frame ===== -->
+  <rect x="122" y="140" width="364" height="392" rx="30"
+        fill="none" stroke="#ffffff" stroke-width="18"/>
+  <!-- three primary-colour clouds: large, overlapping; overlaps = mixed colour -->
+  <g clip-path="url(#boardClip)">
+    <!-- primaries -->
+    <use href="#cloud" fill="#ff4d4d" transform="translate(278 312) scale(1.0)"/>
+    <use href="#cloud" fill="#ffd23d" transform="translate(330 310) scale(1.0)"/>
+    <use href="#cloud" fill="#2f6bf0" transform="translate(304 360) scale(1.0)"/>
+    <!-- pairwise overlaps -->
+    <use href="#cloud" fill="#ff9a2e" transform="translate(278 312) scale(1.0)" clip-path="url(#cB)"/>  <!-- R∩Y = orange -->
+    <use href="#cloud" fill="#27c05a" transform="translate(330 310) scale(1.0)" clip-path="url(#cC)"/>  <!-- Y∩B = green -->
+    <use href="#cloud" fill="#8a3df0" transform="translate(278 312) scale(1.0)" clip-path="url(#cC)"/>  <!-- R∩B = purple -->
+    <!-- triple overlap -->
+    <g clip-path="url(#cC)">
+      <use href="#cloud" fill="#4a3a63" transform="translate(278 312) scale(1.0)" clip-path="url(#cB)"/>
+    </g>
   </g>
 
-  <!-- ===== bottom: AG (white, centred) ===== -->
-  <text x="512" y="836" text-anchor="middle" fill="#ffffff"
-        font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
-        font-size="168" font-weight="800" letter-spacing="6">AG</text>
+  <!-- ===== RIGHT: camera (line art), same size as the board ===== -->
+  <g fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M690 150 h76 v46 h-76 z"/>
+    <rect x="540" y="196" width="364" height="300" rx="48"/>
+    <circle cx="722" cy="356" r="100"/>
+    <circle cx="722" cy="356" r="50"/>
+    <circle cx="592" cy="252" r="12" fill="#ffffff" stroke="none"/>
+  </g>
+
+  <!-- ===== bottom: A | G symmetric about the centre line, compact ===== -->
+  <g fill="#ffffff" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+     font-size="300" font-weight="800">
+    <text x="488" y="880" text-anchor="end">A</text>
+    <text x="536" y="880" text-anchor="start">G</text>
+  </g>
 </svg>
