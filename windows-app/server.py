@@ -821,6 +821,22 @@ def download_status():
     return download_state
 
 
+@app.get("/translate")
+def translate(q: str, tl: str = "zh-TW", sl: str = "auto"):
+    """Display-only translation via Google's free endpoint (needs internet).
+    Used to show the Chinese meaning of an English prompt — does not change
+    what is sent to the model."""
+    try:
+        r = httpx.get("https://translate.googleapis.com/translate_a/single",
+                      params={"client": "gtx", "sl": sl, "tl": tl, "dt": "t", "q": q},
+                      timeout=10)
+        data = r.json()
+        text = "".join(seg[0] for seg in data[0] if seg and seg[0])
+        return {"text": text}
+    except Exception as e:
+        return {"text": "", "error": str(e)}
+
+
 @app.get("/output_dir")
 def output_dir():
     return {"path": str(get_output_dir())}

@@ -146,8 +146,9 @@
         <textarea id="prompt" placeholder="例如：a girl on the beach at sunset, photorealistic"></textarea>
       </div>
       <div class="field">
-        <label>完整提示詞預覽</label>
+        <label>完整提示詞預覽 <button class="mini" style="float:right;padding:2px 8px;font-size:11px" onclick="showMeaning()">🌐 中文意思</button></label>
         <div class="full-preview" id="fullprev">（在上方勾選標籤、輸入描述）</div>
+        <div id="meaning" style="font-size:11px;color:var(--accent2);margin-top:6px;line-height:1.5;display:none"></div>
       </div>
       <div class="field">
         <label>解析度</label>
@@ -275,7 +276,13 @@ function fullPrompt(){const parts=[];
   const soul=(document.getElementById('soul')?.value||'').trim();if(soul)parts.push(soul);
   TAGS.filter(t=>t.active).map(t=>t.phrase.trim()).filter(Boolean).forEach(p=>parts.push(p));
   const page=document.getElementById('prompt').value.trim();if(page)parts.push(page);return parts.join(', ');}
-function updateFull(){document.getElementById('fullprev').textContent=fullPrompt()||'（在上方勾選標籤、輸入描述）';}
+function updateFull(){document.getElementById('fullprev').textContent=fullPrompt()||'（在上方勾選標籤、輸入描述）';
+  const m=document.getElementById('meaning');if(m)m.style.display='none';}   // hide stale meaning on change
+async function showMeaning(){const m=document.getElementById('meaning');const q=fullPrompt();
+  if(!q){return;} m.style.display='block';m.textContent='翻譯中…';
+  try{const d=await (await fetch(`${API}/translate?tl=zh-TW&q=${encodeURIComponent(q)}`)).json();
+    m.textContent='🌐 '+(d.text||'(翻譯失敗，需連網)');}
+  catch{m.textContent='(翻譯失敗，需連網)';}}
 
 // ---- gen settings (steps/seed/count/format/neg/soul) persisted ----
 function loadGen(){let s={};try{s=JSON.parse(localStorage.getItem('aig_gen'))||{};}catch{}
