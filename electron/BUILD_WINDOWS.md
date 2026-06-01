@@ -51,20 +51,28 @@ Embedded Python + server.py      ← FastAPI backend (the "server")
 stable-diffusion.cpp engine      ← downloaded on first run, not bundled
 ```
 
-The packaged layout under the install dir (`C:\AiG`):
+The packaged layout splits **read-only app code** from **user data**:
 
 ```
-C:\AiG\
-  Amazing image Generator.exe        ← Electron shell
+C:\AiG\                               ← install dir (overwritten on update)
+  Amazing image Generator.exe         ← Electron shell
   resources\
-    python\        python.exe + Lib\site-packages\ (embedded CPython runtime)
-    backend\       server.py + static\  (the FastAPI backend + web UI)
-  models\          ← downloaded on first run
-  engine-vulkan\   ← downloaded on first run
-  engine-cpu\      ← downloaded on first run
-  config.json      ← written at runtime
-  logs\            ← written at runtime
+    python\     python.exe + Lib\site-packages\ (embedded CPython runtime)
+    backend\    server.py + static\   (FastAPI backend + web UI)
+
+C:\AiG-data\                          ← USER DATA (survives updates/uninstall)
+  models\         ← downloaded on first run
+  engine-cpu\     ← downloaded on first run (CUDA optional, opt-in)
+  config.json     ← written at runtime
+  logs\           ← written at runtime
 ```
+
+The data dir is deliberately **outside** `C:\AiG` so app updates and reinstalls
+never wipe the user's multi-GB models. The Electron shell passes its location
+to the backend via the `AIG_DATA_DIR` env var (`server.py` resolves it, with
+per-user app-data and the app dir as fallbacks); the installer creates
+`C:\AiG-data` and grants it to `Users` so the non-elevated app can write there.
+Model + engine downloads target this dir automatically (they are `ROOT`-relative).
 
 ---
 

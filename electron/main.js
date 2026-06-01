@@ -44,13 +44,28 @@ let backendExit = null;
 function logBackend(s) {
   backendLog = (backendLog + s).slice(-4000);
 }
+// Where the backend keeps user data (models, engines, config, logs). Kept
+// OUTSIDE the install payload so app updates/reinstalls never wipe the user's
+// downloaded models. Windows uses a fixed ASCII path; other platforms use the
+// per-user app-data dir. In dev (not packaged) we leave it unset so the
+// backend keeps data next to the source.
+function dataDir() {
+  if (!app.isPackaged) return null;
+  return process.platform === 'win32'
+    ? 'C:\\AiG-data'
+    : path.join(app.getPath('userData'), 'data');
+}
+
 function startBackend() {
   const { cmd, args, cwd } = backendCmd();
   logBackend(`launching: ${cmd}\ncwd: ${cwd}\n`);
+  const env = { ...process.env, PORT: String(PORT), ELECTRON_PID: String(process.pid) };
+  const dd = dataDir();
+  if (dd) env.AIG_DATA_DIR = dd;
   try {
     backend = spawn(cmd, args, {
       cwd,
-      env: { ...process.env, PORT: String(PORT), ELECTRON_PID: String(process.pid) },
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     });

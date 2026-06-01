@@ -25,7 +25,15 @@
 
 !macro customInstall
   ; Grant BUILTIN\Users (SID S-1-5-32-545) Modify rights, inherited by
-  ; subfolders/files, so the running app can download engines + models and
-  ; write its config/logs into C:\AiG without elevation.
+  ; subfolders/files, so the running app can write into C:\AiG without
+  ; elevation.
   nsExec::Exec 'icacls "$INSTDIR" /grant *S-1-5-32-545:(OI)(CI)M /T'
+
+  ; Create the data dir (models/engines/config/logs) OUTSIDE the install dir so
+  ; app updates/reinstalls never wipe the user's downloaded models. It lives at
+  ; C:\AiG-data and must be writable by the non-elevated app, so grant Users
+  ; Modify here too. The uninstaller does NOT touch it (it's outside $INSTDIR),
+  ; so models survive uninstall as well.
+  CreateDirectory "C:\AiG-data"
+  nsExec::Exec 'icacls "C:\AiG-data" /grant *S-1-5-32-545:(OI)(CI)M /T'
 !macroend

@@ -35,16 +35,44 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-# When frozen by PyInstaller, sys.executable is the .exe; bundled data (static)
-# lives in sys._MEIPASS. Engines/models/output/logs sit next to the .exe.
-if getattr(sys, "frozen", False):
+# BUNDLE_DIR holds read-only bundled assets (static/), shipped inside the app
+# install dir. ROOT is the *data* dir — models, engines, config.json, logs —
+# and is deliberately kept OUTSIDE the install payload so app updates and
+# reinstalls don't wipe the user's downloaded models (multiple GB). The
+# Electron shell passes AIG_DATA_DIR when packaged (e.g. C:\AiG-data on
+# Windows); in dev we keep data next to the source.
+if getattr(sys, "frozen", False):                 # legacy PyInstaller path
     APP_DIR    = Path(sys.executable).parent
     BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", APP_DIR))
 else:
     APP_DIR    = Path(__file__).parent
     BUNDLE_DIR = APP_DIR
 
-ROOT       = APP_DIR
+def _resolve_data_dir() -> Path:
+    """Pick a writable data dir for models/engines/config/logs. Prefer the
+    Electron-provided AIG_DATA_DIR (kept outside the install payload); fall
+    back to per-user app data, then the app dir, so the backend always has a
+    writable location even if the preferred one isn't usable."""
+    env = os.environ.get("AIG_DATA_DIR")
+    candidates: list[Path] = []
+    if env:
+        candidates.append(Path(env))
+        if os.name == "nt" and os.environ.get("LOCALAPPDATA"):
+            candidates.append(Path(os.environ["LOCALAPPDATA"]) / "AiG")
+    else:
+        candidates.append(APP_DIR)                 # dev: data lives in the repo
+    candidates.append(APP_DIR)                     # final fallback
+    for d in candidates:
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            probe = d / ".write_test"
+            probe.write_text("ok", encoding="utf-8"); probe.unlink()
+            return d
+        except Exception:
+            continue
+    return APP_DIR
+
+ROOT       = _resolve_data_dir()
 EXE_NAME   = "sd-server.exe" if os.name == "nt" else "sd-server"
 # Default output folder (user can override in Settings); kept in Pictures
 # so it's easy to find and survives app updates.
@@ -52,7 +80,7 @@ DEFAULT_OUTPUT_DIR = Path.home() / "Pictures" / "AiG"
 LOG_DIR    = ROOT / "logs"
 STATIC_DIR = BUNDLE_DIR / "static"
 CONFIG_FILE = ROOT / "config.json"
-LOG_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Engine candidates, tried in order: fastest GPU first, then CPU fallback.
 # Each engine lives in its own folder (own DLLs) to avoid conflicts.
