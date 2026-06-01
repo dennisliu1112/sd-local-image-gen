@@ -22,12 +22,25 @@
     "directories": { "output": "release" },
     "files": ["main.js", "preload.js", "package.json"],
     "extraResources": [
-      { "from": "../server_dist/server", "to": "server", "filter": ["**/*"] },
-      { "from": "../windows-app/static", "to": "ui", "filter": ["**/*"] }
+      { "from": "../windows-app", "to": "backend", "filter": ["server.py", "static/**/*"] }
     ],
     "win": {
-      "target": [{ "target": "zip", "arch": ["x64"] }],
-      "icon": "build/icon.ico"
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "extraResources": [
+        { "from": "../runtime", "to": "python", "filter": ["**/*"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
+      "include": "build/installer.nsh",
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "shortcutName": "Amazing image Generator",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "mac": {
       "icon": "build/icon.icns"

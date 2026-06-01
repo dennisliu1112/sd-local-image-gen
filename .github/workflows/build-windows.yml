@@ -1,10 +1,26 @@
 name: Build Windows App (Electron)
 
-# Manual only — each run produces a ~1 GB artifact, so don't build on every
-# push. Trigger from the Actions tab ("Run workflow") when you want a new
-# Windows build.
+# Produces an NSIS installer (~250 MB). Two ways to trigger:
+#   • Manually from the Actions tab ("Run workflow") → build only, uploaded as a
+#     7-day artifact for testing. Does NOT publish a Release.
+#   • Push a version tag (e.g. `git tag v1.1.0 && git push --tags`) → build AND
+#     publish the installer to GitHub Releases, where colleagues can download it
+#     without a login (the repo is public).
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+# Needed so the workflow can create/update a GitHub Release on tag push.
+permissions:
+  contents: write
+
+env:
+  # Embeddable CPython version bundled with the app. python.exe is signed by
+  # the Python Software Foundation, so antivirus leaves it alone — unlike the
+  # old PyInstaller-packed server.exe, which kept getting quarantined.
+  PY_EMBED_VERSION: '3.12.7'
 
 jobs:
   build:
@@ -13,57 +29,86 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # --- Python backend → PyInstaller onedir -----------------------------
-      - name: Install Python deps + PyInstaller
-        shell: cmd
+      # --- Python backend → embedded CPython runtime -----------------------
+      # No PyInstaller. We download the official Windows embeddable package,
+      # enable site-packages, bootstrap pip, then install the backend deps into
+      # it. The result (runtime/) is bundled as-is and run via `python.exe
+      # server.py` — no packer, no exe to trip antivirus heuristics.
+      - name: Build embedded Python runtime
+        shell: pwsh
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r windows-app\requirements.txt pyinstaller
+          $ver = "${{ env.PY_EMBED_VERSION }}"
+          $url = "https://www.python.org/ftp/python/$ver/python-$ver-embed-amd64.zip"
+          Write-Host "Downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile pyembed.zip
+          Expand-Archive -Path pyembed.zip -DestinationPath runtime -Force
 
-      - name: Build backend (PyInstaller onedir)
-        shell: cmd
-        run: |
-          pyinstaller --noconfirm --clean ^
-            --distpath server_dist --workpath build_pyi ^
-            --name server --onedir --console ^
-            --add-data "%CD%\windows-app\static;static" ^
-            --collect-all uvicorn ^
-            --collect-all PIL ^
-            windows-app\server.py
-          dir server_dist\server
+          # Enable site-packages: uncomment the `import site` line so pip-installed
+          # packages under Lib\site-packages are importable.
+          $pth = Get-ChildItem runtime -Filter "python*._pth" | Select-Object -First 1
+          (Get-Content $pth.FullName) `
+            -replace '^\s*#\s*import site', 'import site' `
+            | Set-Content $pth.FullName
 
-      # Engines are NOT bundled — the app downloads them on first run
-      # (keeps this artifact small, ~250 MB instead of ~1 GB).
+          # Bootstrap pip into the embeddable runtime.
+          Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile get-pip.py
+          runtime\python.exe get-pip.py --no-warn-script-location
 
-      # --- Electron shell → electron-builder win zip -----------------------
+          # Install backend deps into the embedded runtime.
+          runtime\python.exe -m pip install --no-warn-script-location -r windows-app\requirements.txt
+
+          # Trim build-time cruft to keep the bundle lean.
+          Remove-Item runtime\get-pip.py -ErrorAction SilentlyContinue
+          Get-ChildItem runtime -Recurse -Directory -Filter "__pycache__" |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+          Write-Host "Smoke test — import the backend's deps:"
+          runtime\python.exe -c "import fastapi, uvicorn, httpx, PIL; print('deps OK')"
+
+      # Engines + models are NOT bundled — the app downloads them on first run
+      # (keeps this artifact small, ~250 MB instead of multiple GB).
+
+      # --- Electron shell → electron-builder NSIS installer ----------------
       - name: Install Electron deps
         shell: cmd
         working-directory: electron
         run: npm ci
 
-      - name: Build Electron app (Windows zip)
+      - name: Build Electron app (Windows NSIS installer)
         shell: cmd
         working-directory: electron
-        run: npx electron-builder --win zip --x64
+        # --publish never: electron-builder builds only. Publishing to Releases
+        # is handled explicitly by the softprops step below, so we don't want
+        # electron-builder to auto-publish (which it may try to do on a tag).
+        run: npx electron-builder --win nsis --x64 --publish never
 
-      - name: Stage release + README
-        shell: bash
+      - name: Stage installer
+        shell: pwsh
         run: |
-          mkdir -p out
-          cp electron/release/*.zip "out/" 2>/dev/null || true
-          ls -lh out/
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Copy-Item electron/release/*.exe out/ -ErrorAction SilentlyContinue
+          Get-ChildItem out
 
-      - name: Upload
+      # Always upload as a build artifact (handy for testing a workflow_dispatch
+      # build without cutting a Release). Expires after 7 days, login required.
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AmazingImageGenerator-Windows-${{ github.run_number }}
-          path: out/*.zip
+          name: AmazingImageGenerator-Windows-Setup-${{ github.run_number }}
+          path: out/*.exe
           retention-days: 7
+
+      # On a version-tag push, publish the installer to GitHub Releases so
+      # colleagues can download it directly (no login on a public repo). The
+      # release is created from the pushed tag if it doesn't already exist.
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.exe
+          fail_on_unmatched_files: true
+          generate_release_notes: true

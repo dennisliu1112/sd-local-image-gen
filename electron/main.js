@@ -13,11 +13,23 @@ let win = null;
 let quitting = false;
 
 // --- Resolve how to launch the Python backend -----------------------------
+// We no longer ship a PyInstaller-packed server.exe (it tripped antivirus
+// heuristics and got quarantined). Instead we bundle an embedded CPython
+// runtime + the server.py source and run `python.exe server.py` directly.
+// python.exe is signed by the Python Software Foundation, so AV leaves it
+// alone; server.py is plain source, nothing to flag.
 function backendCmd() {
   if (app.isPackaged) {
-    const exe = process.platform === 'win32' ? 'server.exe' : 'server';
-    const bin = path.join(process.resourcesPath, 'server', exe);
-    return { cmd: bin, args: [], cwd: path.dirname(bin) };
+    const res = process.resourcesPath;
+    const script = path.join(res, 'backend', 'server.py');
+    const cwd = path.join(res, 'backend');
+    if (process.platform === 'win32') {
+      const py = path.join(res, 'python', 'python.exe');
+      return { cmd: py, args: [script], cwd };
+    }
+    // macOS / Linux packaged: embedded python lives in python/bin/python3
+    const py = path.join(res, 'python', 'bin', 'python3');
+    return { cmd: py, args: [script], cwd };
   }
   // dev: run the repo's Python server via the project venv
   const py = process.platform === 'win32'
@@ -74,7 +86,7 @@ function showBackendError() {
 // own "啟動中…" / first-run setup state. No blocking loading screen.
 function indexPath() {
   return app.isPackaged
-    ? path.join(process.resourcesPath, 'ui', 'index.html')
+    ? path.join(process.resourcesPath, 'backend', 'static', 'index.html')
     : path.join(__dirname, '..', 'windows-app', 'static', 'index.html');
 }
 

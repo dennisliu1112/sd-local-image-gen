@@ -60,3 +60,7 @@ electron/release/
 server_dist/
 build_pyi/
 *.spec
+
+# Embedded Python runtime (built by build_windows.ps1 / CI, not committed)
+runtime/
+get-pip.py
