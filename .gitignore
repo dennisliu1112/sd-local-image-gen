@@ -65,5 +65,9 @@ build_pyi/
 runtime/
 get-pip.py
 
+# macOS build artifacts (built by build_macos.sh, not committed)
+runtime-mac/
+mac-engine/
+
 # Local build logs
 build_log*.txt

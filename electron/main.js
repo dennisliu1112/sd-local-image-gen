@@ -2,11 +2,30 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
-const http = require('http');
+const net = require('net');
 const kill = require('tree-kill');
 
-const PORT = 8080;
-const BASE = `http://127.0.0.1:${PORT}`;
+// The API port is chosen dynamically at startup. 8080 was hard-coded before
+// and is frequently taken by other apps (dev servers, proxies…), which made
+// the backend fail to bind and the app appear to "crash". We now ask the OS
+// for a free port, hand it to the backend via the PORT env var, and inject it
+// into the UI so the renderer talks to the right place. 0 = not yet chosen.
+let PORT = 0;
+
+// Ask the OS for an ephemeral free port: bind to :0, read what we got, release
+// it. There's a tiny race (another process could grab it before the backend
+// binds), but on a loopback ephemeral port that's vanishingly rare in practice.
+function findFreePort() {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.unref();
+    srv.on('error', () => resolve(8080));   // fall back to the old default
+    srv.listen(0, '127.0.0.1', () => {
+      const p = srv.address().port;
+      srv.close(() => resolve(p));
+    });
+  });
+}
 
 let backend = null;
 let win = null;
@@ -127,8 +146,10 @@ async function createWindow() {
 
   // Load the real UI from disk immediately — no waiting on the backend. The
   // page shows a "啟動中…" status and opens its own setup screen as soon as
-  // the backend reports what (if anything) needs downloading.
-  await win.loadFile(indexPath());
+  // the backend reports what (if anything) needs downloading. We pass the
+  // dynamically-chosen API port via the query string so the renderer (loaded
+  // from file://) knows where to reach the backend.
+  await win.loadFile(indexPath(), { search: 'port=' + PORT });
   win.show();
 }
 
@@ -143,8 +164,9 @@ ipcMain.handle('pick-folder', async () => {
   return (r.canceled || !r.filePaths.length) ? null : r.filePaths[0];
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   installMenu();
+  PORT = await findFreePort();        // pick a free port before starting anything
   startBackend();
   createWindow();
 });

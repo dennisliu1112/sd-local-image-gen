@@ -1,18 +1,45 @@
-# macOS Build TODO — ship a `.dmg` alongside the Windows `.exe`
+# macOS Build — ship a `.dmg` alongside the Windows `.exe`
 
-> Resume note for picking this up on a macOS machine. The `.dmg` **must be built
-> and tested on macOS** (electron-builder can't produce/test a mac app on
-> Windows), so this work was deferred until on the Mac.
+> ✅ **DONE as of v1.1.1.** The mac `.dmg` builds with [`build_macos.sh`](../build_macos.sh)
+> and is released alongside the Windows `.exe`. This doc is kept as the design
+> record + how-to. The `.dmg` **must be built on macOS** (electron-builder can't
+> produce a mac app on Windows).
 >
-> Companion docs: [BUILD_WINDOWS.md](BUILD_WINDOWS.md) (current Windows pipeline).
+> Companion docs: [BUILD_WINDOWS.md](BUILD_WINDOWS.md) (Windows pipeline).
 
-## Status (as of Windows v1.1.0)
+## How to build the mac dmg
 
-- ✅ Windows shipped: NSIS installer → `C:\AiG`, embedded CPython backend (no
+```bash
+./build_macos.sh        # from the repo root, on an Apple Silicon Mac
+# → electron/release/Amazing image Generator-<version>-mac-arm64.dmg
+```
+
+It fetches a relocatable CPython (python-build-standalone, pinned to match the
+Windows 3.12.7), installs the backend deps into it, bundles the Metal
+`sd-server` engine, and runs electron-builder. Prereq: the Metal engine exists
+at `src/build/bin/sd-server` (see "Engine" below).
+
+## Status (shipped in v1.1.1)
+
+- ✅ **Windows**: NSIS installer → `C:\AiG`, embedded CPython backend (no
   PyInstaller), engine auto-selects CPU (never Vulkan — Z-Image renders blank on
-  it, sd.cpp#1031), user data in `C:\AiG-data` (survives updates).
-- ⏳ This doc: add a macOS `.dmg` to the **same** GitHub Release so users pick
-  their OS.
+  it, sd.cpp#1031), user data in `C:\AiG-data`. Built by CI on tag push.
+- ✅ **macOS (arm64)**: `.dmg`, relocatable CPython + **bundled** Metal
+  `sd-server` (no download path on mac), user data in
+  `~/Library/Application Support/Amazing image Generator/data`. Z-Image **renders
+  correctly on Metal** (verified end-to-end). Built locally with
+  `build_macos.sh`, uploaded to the same GitHub Release as the `.exe`.
+
+### Gatekeeper note for users (unsigned build)
+
+The `.dmg` is **not signed/notarized** ($99 Apple Developer Program). On first
+launch macOS shows "unidentified developer". Workarounds:
+
+- Right-click the app → **Open** → **Open** (once), or
+- `xattr -dr com.apple.quarantine "/Applications/Amazing image Generator.app"`
+
+The bundled `sd-server` and CPython binaries are already ad-hoc signed, so they
+exec fine once the app itself is allowed.
 
 ## Why most of the port is cheap
 

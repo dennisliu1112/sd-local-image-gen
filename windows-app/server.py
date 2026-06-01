@@ -86,8 +86,13 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # Each engine lives in its own folder (own DLLs) to avoid conflicts.
 # device pref (config "device"): "auto" | "gpu" | "cpu".
 def engine_base_dirs():
-    """Folders to scan for engines: the app dir, plus a user-specified one."""
+    """Folders to scan for engines: the data dir, the bundled-assets dir, plus
+    a user-specified one. On macOS the engine ships *inside* the app (next to
+    server.py under BUNDLE_DIR), so we must scan there; on Windows nothing lives
+    in BUNDLE_DIR (engines download to the data dir), so it's a harmless no-op."""
     dirs = [ROOT]
+    if BUNDLE_DIR not in dirs:
+        dirs.append(BUNDLE_DIR)
     ed = load_config().get("engine_dir")
     if ed:
         p = Path(ed)
@@ -172,10 +177,31 @@ def models_ready() -> bool:
     m = model_paths()
     return m["diff"].exists() and m["vae"].exists() and m["llm"].exists()
 
-SD_PORT            = int(os.environ.get("SD_SERVER_PORT", "8190"))
+def _free_port(default: int) -> int:
+    """Ask the OS for a free loopback port. Used so neither the public API port
+    nor the internal sd-server port collides with whatever else is running on
+    the machine (8080/8190 were hard-coded and got squatted often). Falls back
+    to `default` if the probe fails."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+        return port
+    except Exception:
+        return default
+
+# Internal port for sd-server (server.py ↔ sd-server, loopback only). Chosen
+# dynamically unless pinned via SD_SERVER_PORT, so a stale/other process on the
+# old fixed 8190 can't block startup.
+SD_PORT            = int(os.environ.get("SD_SERVER_PORT") or _free_port(8190))
 SD_URL             = f"http://127.0.0.1:{SD_PORT}"
 SD_READY_TIMEOUT   = 300
-API_PORT           = int(os.environ.get("PORT", "8080"))
+# Public API port. The Electron shell picks a free port and passes it via PORT;
+# when run standalone we pick one too (fall back to 8080 only if the probe
+# fails) so the backend never dies just because the port was taken.
+API_PORT           = int(os.environ.get("PORT") or _free_port(8080))
 
 from collections import deque
 _LOG_BUFFER: deque = deque(maxlen=400)
@@ -967,6 +993,7 @@ def index():
 # ---------------------------------------------------------------------------
 def _serve():
     import uvicorn
+    log.info("API listening on http://127.0.0.1:%d  (sd-server on :%d)", API_PORT, SD_PORT)
     uvicorn.run(app, host="0.0.0.0", port=API_PORT, log_level="warning")
 
 

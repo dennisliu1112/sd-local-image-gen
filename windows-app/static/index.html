@@ -267,9 +267,13 @@
 
 <script>
 // When the shell is opened directly from disk (Electron loads it instantly,
-// before the backend is up), talk to the backend over localhost. When the
+// before the backend is up), talk to the backend over localhost. The port is
+// chosen dynamically by the shell (8080 was often taken by other apps) and
+// passed in via ?port=NNNN; fall back to 8080 for a plain browser. When the
 // backend serves this page itself, relative URLs work.
-const API = (location.protocol === 'file:') ? 'http://127.0.0.1:8080' : '';
+const API = (location.protocol === 'file:')
+  ? `http://127.0.0.1:${new URLSearchParams(location.search).get('port') || 8080}`
+  : '';
 let curJob=null,curSeed=-1,pollT=null,logT=null,t0=0,engine='',W=512,H=512;
 let curW,curH,curPrompt,curNeg;
 
