@@ -82,13 +82,22 @@ def engine_candidates():
             all_e.append(("gpu", flat)); seen.add("gpu")
 
     dev = load_config().get("device", "auto")
+    # Z-Image renders a BLANK/white image on the Vulkan backend — a known,
+    # unresolved stable-diffusion.cpp bug (leejet/stable-diffusion.cpp#1031)
+    # that affects every GPU vendor and, crucially, does NOT error out (the
+    # run "succeeds", so the normal failure-fallback never triggers). So we
+    # never auto-select Vulkan: prefer CUDA/Metal, otherwise fall back to CPU
+    # (slower but correct). Vulkan is a last resort only — used solely when it
+    # is the only engine installed.
+    usable = [e for e in all_e if e[0] != "vulkan"]
     if dev == "cpu":
-        filtered = [e for e in all_e if e[0] == "cpu"]
+        filtered = [e for e in usable if e[0] == "cpu"]
     elif dev == "gpu":
-        filtered = [e for e in all_e if e[0] != "cpu"]
+        filtered = [e for e in usable if e[0] != "cpu"]
     else:
-        filtered = all_e
-    return filtered or all_e          # never return empty
+        filtered = usable
+    # Prefer a correct backend; only surface Vulkan if nothing else exists.
+    return filtered or usable or all_e          # never return empty
 
 # ---------------------------------------------------------------------------
 # Config — model_dir can be set by installer or user at any time
@@ -782,9 +791,13 @@ def download_engine(req: EngineDLRequest):
         return {"active": False, "error": "引擎下載僅支援 Windows；其他平台請手動放入引擎。"}
     if engine_dl.get("active"):
         return {"active": True, "label": engine_dl.get("label", "")}
-    labels = [l for l in (req.which or ["vulkan", "cpu"]) if l in ENGINE_ZIPS]
+    # Default to CPU only — it works on every machine and produces correct
+    # images. Vulkan is intentionally NOT in the default set: Z-Image renders
+    # blank on it (see engine_candidates / sd.cpp#1031). NVIDIA users opt into
+    # CUDA explicitly from the first-run screen.
+    labels = [l for l in (req.which or ["cpu"]) if l in ENGINE_ZIPS]
     if not labels:
-        labels = ["vulkan", "cpu"]
+        labels = ["cpu"]
     threading.Thread(target=_download_engines_then_start, args=(labels,), daemon=True).start()
     return {"active": True, "which": labels}
 

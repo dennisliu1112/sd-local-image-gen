@@ -64,3 +64,6 @@ build_pyi/
 # Embedded Python runtime (built by build_windows.ps1 / CI, not committed)
 runtime/
 get-pip.py
+
+# Local build logs
+build_log*.txt

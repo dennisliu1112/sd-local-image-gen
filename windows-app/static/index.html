@@ -123,8 +123,8 @@
 
     <div class="setupsec">
       <div class="sectitle">① 執行引擎 <span id="eng-state" class="badge"></span></div>
-      <button class="pri" id="eng-dl-std" onclick="dlEngine(['vulkan','cpu'])">下載通用引擎（Vulkan + CPU，約 230 MB）</button>
-      <div class="hint">適用所有顯卡與無顯卡電腦，建議先安裝這個。</div>
+      <button class="pri" id="eng-dl-std" onclick="dlEngine(['cpu'])">下載通用引擎（CPU，相容所有電腦，約 80 MB）</button>
+      <div class="hint">適用所有電腦，穩定可靠（速度較慢）。建議先安裝這個。NVIDIA 顯卡可再加裝下方 CUDA 加速。</div>
       <button class="sec" id="eng-dl-cuda" onclick="dlEngine(['cuda'])">加裝 NVIDIA 加速（CUDA，約 +600 MB，僅 NVIDIA 顯卡）</button>
       <div class="setrow2"><input type="text" id="eng-dir" placeholder="或指定引擎資料夾（內含 engine-vulkan 等）"><button class="mini" onclick="browseEng()">瀏覽…</button><button class="mini" onclick="saveEngDir()">套用</button></div>
       <div id="eng-status" class="dlstatus"></div>
@@ -443,8 +443,8 @@ function paintSetup(d){
   if(ins.includes('cuda')){cuda.disabled=true;cuda.textContent='✓ 已安裝 CUDA 加速';}
   else{cuda.disabled=false;cuda.textContent='加裝 NVIDIA 加速（CUDA，約 +600 MB，僅 NVIDIA 顯卡）';}
   const std=document.getElementById('eng-dl-std');
-  const hasStd=ins.includes('vulkan')||ins.includes('cpu')||ins.includes('gpu');
-  std.textContent=hasStd?'重新下載通用引擎（Vulkan + CPU）':'下載通用引擎（Vulkan + CPU，約 230 MB）';
+  const hasStd=ins.includes('cpu')||ins.includes('gpu');
+  std.textContent=hasStd?'重新下載通用引擎（CPU）':'下載通用引擎（CPU，相容所有電腦，約 80 MB）';
   return eng&&mdl;
 }
 async function firstRunCheck(){try{const d=await (await fetch(`${API}/config`)).json();const ready=paintSetup(d);
