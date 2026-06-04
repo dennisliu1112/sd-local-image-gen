@@ -252,6 +252,21 @@
       </div>
     </div>
     <div class="setsec">
+      <h3>進階 — 大型電腦解鎖 ⚡</h3>
+      <div class="tip" style="border-color:#5a4a1a;background:#1f1a0e">⚠️ 以下是給<b>高階電腦</b>（大記憶體 / 大顯存）的選項。在一般電腦上開啟可能變很慢、甚至生圖失敗或閃退。預設值對小電腦最安全，沒把握就別動。</div>
+      <div class="setrow"><label>模型品質</label>
+        <select id="quant" style="width:280px" onchange="applyQuant()"></select></div>
+      <div class="rowhint">Q4 = 小、相容所有電腦（預設）；Q8 = 高品質、需更多記憶體/顯存。切換後若該模型尚未下載，請到上方「模型」區塊下載它。</div>
+      <div id="quantdl" style="font-size:12px;color:var(--y1);margin:6px 0 2px;display:none"></div>
+      <div class="setrow" style="margin-top:14px"><label>自訂解析度</label>
+        <input type="number" id="advW" min="256" max="8192" step="64" placeholder="寬" style="width:90px">
+        <span style="color:var(--faint)">×</span>
+        <input type="number" id="advH" min="256" max="8192" step="64" placeholder="高" style="width:90px">
+        <button class="mini" onclick="applyAdvRes()">套用尺寸</button></div>
+      <div class="rowhint">解除一般上限，最高可到 <b id="maxres">8192</b>px。8K 等級需要極大顯存/記憶體，失敗多半是記憶體不足。設定後會覆蓋上方的解析度按鈕，且只套用到這次工作階段。</div>
+      <span class="saved" id="advsaved"></span>
+    </div>
+    <div class="setsec">
       <h3>生成資料夾（圖片儲存位置）</h3>
       <div class="setrow">
         <input type="text" id="outdir" style="flex:1" placeholder="例如 D:\AiG\output">
@@ -488,8 +503,44 @@ async function loadConfig(){try{const d=await (await fetch(`${API}/config`)).jso
   document.getElementById('lowvram').checked=!!d.low_vram;
   document.getElementById('modeldir').value=d.model_dir||'';
   document.getElementById('outdir').value=d.output_dir||'';
+  // --- advanced ---
+  const qsel=document.getElementById('quant');
+  if(qsel&&Array.isArray(d.diffusion_variants)){
+    qsel.innerHTML=d.diffusion_variants.map(v=>`<option value="${v.id}">${v.label}（約 ${v.size_gb}GB）</option>`).join('');
+    qsel.value=d.diffusion_quant||'Q4';
+  }
+  const mr=document.getElementById('maxres');if(mr&&d.max_resolution)mr.textContent=d.max_resolution;
+  const aw=document.getElementById('advW'),ah=document.getElementById('advH');
+  if(aw&&d.max_resolution){aw.max=d.max_resolution;ah.max=d.max_resolution;}
+  const qd=document.getElementById('quantdl');
+  if(qd){const miss=(d.missing||[]).some(f=>f.indexOf('z_image')>=0);
+    qd.style.display=miss?'block':'none';
+    qd.textContent=miss?'⚠️ 目前選的模型尚未下載 — 請到上方「模型」區塊點該檔的「下載」。':'';}
   hydrateUI(d.ui);
   renderModels(d.models||[]);}catch{}}
+
+// Advanced: switch the diffusion model quality (Q4↔Q8). Saving may mark the new
+// model "missing" — the model list above then shows it with a download button.
+async function applyQuant(){
+  const q=document.getElementById('quant').value;
+  const m=document.getElementById('advsaved');m.textContent='切換中…';
+  try{await fetch(`${API}/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({diffusion_quant:q})});
+    await loadConfig();                       // refresh model list + missing hint
+    m.textContent='已套用 ✓';setTimeout(()=>m.textContent='',3000);checkReady();
+  }catch(e){m.textContent='失敗：'+e.message;}}
+
+// Advanced: set a custom resolution (up to the backend ceiling), overriding the
+// preset buttons for this session.
+function applyAdvRes(){
+  const max=+(document.getElementById('advW').max||8192);
+  let w=Math.round(+document.getElementById('advW').value||0),
+      h=Math.round(+document.getElementById('advH').value||0);
+  if(!w||!h){alert('請輸入寬與高');return;}
+  w=Math.max(256,Math.min(max,w));h=Math.max(256,Math.min(max,h));
+  document.getElementById('advW').value=w;document.getElementById('advH').value=h;
+  W=w;H=h;
+  document.querySelectorAll('#resseg button').forEach(e=>e.classList.remove('on'));
+  const m=document.getElementById('advsaved');m.textContent=`已設為 ${w}×${h} ✓`;setTimeout(()=>m.textContent='',4000);}
 
 // Pull tags + gen settings from the backend (durable store). Runs once: if the
 // backend has them, they win (and refresh localStorage); if it has none yet,

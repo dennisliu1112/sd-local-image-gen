@@ -164,11 +164,43 @@ def get_output_dir() -> Path:
         d.mkdir(parents=True, exist_ok=True)
     return d
 
+# The diffusion model ships in quantization variants. Q4 (default) is the
+# small, fits-everywhere build aimed at low-spec machines; Q8 is larger and
+# higher quality for powerful machines (selectable in Settings → Advanced).
+# Each maps to its GGUF filename + ungated download URL.
+DIFFUSION_VARIANTS = {
+    "Q4": {"file": "z_image_turbo-Q4_K.gguf",
+           "url":  "https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q4_K.gguf",
+           "label": "Q4 — 小、相容所有電腦（預設）", "size_gb": 3.7},
+    "Q8": {"file": "z_image_turbo-Q8_0.gguf",
+           "url":  "https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q8_0.gguf",
+           "label": "Q8 — 高品質、需大記憶體/VRAM", "size_gb": 6.6},
+}
+# Absolute resolution ceiling the backend will accept. Normal UI keeps users at
+# safe sizes; Advanced mode unlocks up to this for powerful machines (8K-ish).
+MAX_RESOLUTION = 8192
+# If an Advanced (oversized) generation fails — typically OOM on a machine that
+# can't handle the big resolution — we retry once at this safe size instead of
+# just failing. "If the advanced setting fails, fall back to normal."
+SAFE_RESOLUTION = 1024
+
+def get_diffusion_quant() -> str:
+    q = str(load_config().get("diffusion_quant") or "Q4").upper()
+    return q if q in DIFFUSION_VARIANTS else "Q4"
+
+def diffusion_file() -> str:
+    """Filename of the currently-selected diffusion model (Q4/Q8)."""
+    return DIFFUSION_VARIANTS[get_diffusion_quant()]["file"]
+
+def model_files() -> list:
+    """The three model files required *for the current quant selection*."""
+    return [diffusion_file(), "ae.safetensors", "Qwen3-4B-Q4_K_M.gguf"]
+
 def model_paths():
     d = get_model_dir()
     return {
         "dir":  d,
-        "diff": d / "z_image_turbo-Q4_K.gguf",
+        "diff": d / diffusion_file(),
         "vae":  d / "ae.safetensors",
         "llm":  d / "Qwen3-4B-Q4_K_M.gguf",
     }
@@ -480,6 +512,21 @@ def worker():
                 t0 = time.monotonic()   # reset timer for the CPU attempt
                 ok, r, err = _try_generate()
 
+        # Advanced fallback: if it still failed AND the request used an oversized
+        # (Advanced) resolution, retry once at a safe size. Big images OOM on
+        # modest hardware; a 1024² retry usually succeeds — better a smaller
+        # image than a hard failure. ("Advanced fails → fall back to normal.")
+        if not ok and max(payload["width"], payload["height"]) > SAFE_RESOLUTION:
+            orig = f'{payload["width"]}×{payload["height"]}'
+            log.warning("[%s] failed at %s (%s) — retrying at %d² (advanced fallback)…",
+                        job_id[:8], orig, err[:80], SAFE_RESOLUTION)
+            payload["width"] = payload["height"] = SAFE_RESOLUTION
+            job["width"]    = job["height"] = SAFE_RESOLUTION   # keep metadata honest
+            job["status"]   = "running"
+            job["fallback"] = f"原尺寸 {orig} 失敗,已自動改用 {SAFE_RESOLUTION}×{SAFE_RESOLUTION}"
+            t0 = time.monotonic()
+            ok, r, err = _try_generate()
+
         elapsed = time.monotonic() - t0
         if ok and r is not None:
             img_b64 = r.json()["images"][0]
@@ -625,8 +672,11 @@ def shutdown():
 class GenerateRequest(BaseModel):
     prompt:          str
     negative_prompt: str  = ""
-    width:           int  = Field(1024, ge=256, le=2048)
-    height:          int  = Field(1024, ge=256, le=2048)
+    # Ceiling is the absolute hardware limit (Advanced mode); the normal UI
+    # keeps users at safe sizes. Big resolutions need a powerful machine and
+    # may OOM/fail on weak ones — that's the user's call in Advanced mode.
+    width:           int  = Field(1024, ge=256, le=MAX_RESOLUTION)
+    height:          int  = Field(1024, ge=256, le=MAX_RESOLUTION)
     steps:           int  = Field(4, ge=1, le=50)
     cfg_scale:       float = Field(1.0, ge=0.1, le=20.0)
     seed:            int  = Field(-1)
@@ -754,6 +804,7 @@ class ConfigRequest(BaseModel):
     output_dir: Optional[str] = None
     model_urls: Optional[dict] = None
     engine_dir: Optional[str] = None
+    diffusion_quant: Optional[str] = None   # advanced: "Q4" | "Q8"
     ui: Optional[dict] = None          # UI prefs (tags, gen settings) — kept on disk
 
 @app.get("/config")
@@ -761,7 +812,8 @@ def get_config_endpoint():
     m = model_paths()
     cfg = load_config()
     urls = get_model_urls()
-    files = {"z_image_turbo-Q4_K.gguf": m["diff"], "ae.safetensors": m["vae"], "Qwen3-4B-Q4_K_M.gguf": m["llm"]}
+    # The diffusion slot reflects the current Q4/Q8 selection; vae + llm fixed.
+    files = {diffusion_file(): m["diff"], "ae.safetensors": m["vae"], "Qwen3-4B-Q4_K_M.gguf": m["llm"]}
     return {
         "model_dir": str(m["dir"]),
         "output_dir": str(get_output_dir()),
@@ -773,6 +825,11 @@ def get_config_endpoint():
         "ui": cfg.get("ui", {}),                     # tags + gen settings (durable)
         "engines_ready": _engines_present(),
         "engines_installed": installed_engines(),   # subset of cuda/vulkan/cpu/gpu
+        # --- Advanced (for powerful machines) ---
+        "diffusion_quant": get_diffusion_quant(),    # "Q4" | "Q8"
+        "diffusion_variants": [{"id": k, "label": v["label"], "size_gb": v["size_gb"]}
+                               for k, v in DIFFUSION_VARIANTS.items()],
+        "max_resolution": MAX_RESOLUTION,
         "models": [{"name": f, "exists": p.exists(), "url": urls.get(f, ""),
                     "role": MODEL_META.get(f, {}).get("role", ""),
                     "license": MODEL_META.get(f, {}).get("license", ""),
@@ -783,14 +840,21 @@ def get_config_endpoint():
 @app.post("/config")
 def set_config_endpoint(req: ConfigRequest):
     cfg = load_config()
+    quant_changed = False
     if req.model_dir is not None:
         cfg["model_dir"] = str(Path(req.model_dir))
     if req.output_dir is not None:
         cfg["output_dir"] = str(Path(req.output_dir))
     if req.model_urls is not None:
-        cfg["model_urls"] = {k: v for k, v in req.model_urls.items() if k in MODEL_FILES}
+        known = set(get_model_urls().keys())   # all known model files (Q4/Q8/vae/llm)
+        cfg["model_urls"] = {k: v for k, v in req.model_urls.items() if k in known}
     if req.engine_dir is not None:
         cfg["engine_dir"] = str(Path(req.engine_dir)) if req.engine_dir else ""
+    if req.diffusion_quant is not None:
+        q = str(req.diffusion_quant).upper()
+        if q in DIFFUSION_VARIANTS and q != cfg.get("diffusion_quant", "Q4"):
+            cfg["diffusion_quant"] = q
+            quant_changed = True
     if req.ui is not None:
         cfg["ui"] = {**cfg.get("ui", {}), **req.ui}    # merge so partial saves keep the rest
     save_config(cfg)
@@ -798,10 +862,15 @@ def set_config_endpoint(req: ConfigRequest):
     if req.engine_dir is not None and _engines_present() and not sd_alive():
         threading.Thread(target=start_sd_server, daemon=True).start()
     ready = models_ready()
-    # Models just became available → bring the engine up.
-    if ready and sd_status.get("state") not in ("ready", "starting"):
+    # Switching diffusion model (Q4↔Q8): reload the engine with the newly
+    # selected model if it's already downloaded; otherwise the UI shows it as
+    # missing and prompts a download (which then starts the engine).
+    if quant_changed and ready:
+        threading.Thread(target=restart_engine, daemon=True).start()
+    elif ready and sd_status.get("state") not in ("ready", "starting"):
         threading.Thread(target=start_sd_server, daemon=True).start()
-    return {"model_dir": str(get_model_dir()), "output_dir": str(get_output_dir()), "models_ready": ready}
+    return {"model_dir": str(get_model_dir()), "output_dir": str(get_output_dir()),
+            "models_ready": ready, "diffusion_quant": get_diffusion_quant()}
 
 
 class EngineRequest(BaseModel):
@@ -873,18 +942,24 @@ def get_logs():
 # --- Model download (replaces download_models.bat) -------------------------
 download_state = {"active": False, "pct": 0, "file": "", "done": False, "error": ""}
 
-MODEL_FILES = ["z_image_turbo-Q4_K.gguf", "ae.safetensors", "Qwen3-4B-Q4_K_M.gguf"]
-# Ungated, no-login direct-download mirrors (verified):
+# Fixed (non-diffusion) model files. The diffusion file is variant-dependent
+# (Q4/Q8) and comes from DIFFUSION_VARIANTS — see model_files().
+VAE_FILE = "ae.safetensors"
+LLM_FILE = "Qwen3-4B-Q4_K_M.gguf"
+
+# Ungated, no-login direct-download mirrors (verified). Includes *every*
+# diffusion variant so the user can switch Q4↔Q8 and download just that file.
 DEFAULT_URLS = {
-    "z_image_turbo-Q4_K.gguf": "https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q4_K.gguf",
-    "ae.safetensors":          "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors",
-    "Qwen3-4B-Q4_K_M.gguf":    "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+    VAE_FILE: "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors",
+    LLM_FILE: "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+    **{v["file"]: v["url"] for v in DIFFUSION_VARIANTS.values()},
 }
 
 MODEL_META = {
-    "z_image_turbo-Q4_K.gguf": {"role": "擴散模型（畫師）", "license": "Apache 2.0", "source": "Tongyi-MAI/Z-Image-Turbo"},
-    "ae.safetensors":          {"role": "VAE（解碼成圖）",  "license": "Apache 2.0", "source": "black-forest-labs/FLUX.1-schnell"},
-    "Qwen3-4B-Q4_K_M.gguf":    {"role": "文字編碼（翻譯）", "license": "Apache 2.0", "source": "Qwen/Qwen3-4B"},
+    VAE_FILE: {"role": "VAE（解碼成圖）",  "license": "Apache 2.0", "source": "black-forest-labs/FLUX.1-schnell"},
+    LLM_FILE: {"role": "文字編碼（翻譯）", "license": "Apache 2.0", "source": "Qwen/Qwen3-4B"},
+    **{v["file"]: {"role": "擴散模型（畫師）", "license": "Apache 2.0", "source": "Tongyi-MAI/Z-Image-Turbo"}
+       for v in DIFFUSION_VARIANTS.values()},
 }
 
 def get_model_urls() -> dict:
@@ -900,7 +975,7 @@ def _download_thread(dest: Path, only: Optional[str] = None):
     download_state.update(active=True, done=False, error="", pct=0, file="")
     try:
         dest.mkdir(parents=True, exist_ok=True)
-        targets = [only] if only else MODEL_FILES
+        targets = [only] if only else model_files()
         for fname in targets:
             url = urls.get(fname)
             out = dest / fname
@@ -922,8 +997,11 @@ def _download_thread(dest: Path, only: Optional[str] = None):
             os.replace(tmp, str(out))
         download_state.update(active=False, done=True, pct=100, file="")
         log.info("Model download complete.")
-        if models_ready() and sd_status.get("state") != "ready":
-            threading.Thread(target=start_sd_server, daemon=True).start()
+        # Reload the engine with whatever model is now selected. We restart even
+        # if one is already running (state == "ready"): switching Q4↔Q8 then
+        # downloading the new file must swap the loaded model, not keep the old.
+        if models_ready():
+            threading.Thread(target=restart_engine, daemon=True).start()
     except Exception as e:
         download_state.update(active=False, error=str(e))
         log.error("Model download failed: %s", e)
@@ -936,7 +1014,7 @@ class DownloadRequest(BaseModel):
 def download_models(req: DownloadRequest = DownloadRequest()):
     if download_state["active"]:
         return {"active": True}
-    only = req.file if (req and req.file in MODEL_FILES) else None
+    only = req.file if (req and req.file in get_model_urls()) else None
     threading.Thread(target=_download_thread, args=(get_model_dir(), only), daemon=True).start()
     return {"active": True, "file": only}
 
